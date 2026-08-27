@@ -1,0 +1,40 @@
+name: ai-interviewer-platform
+
+services:
+  postgres:
+    image: ai-interviewer-postgres:17.11-secure
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    user: "70:70"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_DB: ai_interviewer
+      POSTGRES_USER: ai_interviewer
+      POSTGRES_PASSWORD: local-only
+    command:
+      - postgres
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - log_statement=none
+    ports:
+      - "127.0.0.1:${AI_INTERVIEWER_DB_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_interviewer -d ai_interviewer"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp:uid=70,gid=70,mode=1770
+      - /var/run/postgresql:uid=70,gid=70,mode=0770
+
+volumes:
+  postgres-data:

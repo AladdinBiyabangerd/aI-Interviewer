@@ -1,0 +1,82 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-interviewer-platform"
+version = "0.1.0"
+description = "Production-oriented AI Interviewer Platform"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "alembic>=1.14,<2",
+  "boto3>=1.40,<2",
+  "cryptography>=46,<51",
+  "fastapi>=0.115,<1.0",
+  "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
+  "opentelemetry-sdk>=1.44,<2",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.7,<3.0",
+  "pyjwt[crypto]>=2.13,<3",
+  "sqlalchemy[asyncio]>=2.0,<3",
+  "uuid6>=2024,<2027",
+  "uvicorn[standard]>=0.34,<1.0",
+]
+
+[project.scripts]
+ai-interviewer-api = "ai_interviewer.runner:main"
+ai-interviewer-baseline = "ai_interviewer.reliability.cli:main"
+ai-interviewer-migrate = "ai_interviewer.persistence.migrate:main"
+
+[dependency-groups]
+dev = [
+  "boto3-stubs[s3]>=1.40,<2",
+  "httpx2>=2,<3",
+  "mypy>=1.15,<2.0",
+  "pytest>=9.0.3,<10",
+  "pytest-asyncio>=1,<2",
+  "pytest-cov>=6.0,<7.0",
+  "ruff>=0.9,<1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_interviewer"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers --cov=ai_interviewer --cov-report=term-missing --cov-fail-under=95"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+  "integration: requires an isolated PostgreSQL database",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["ai_interviewer"]
+
+[tool.coverage.report]
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]
+show_missing = true
+skip_covered = true
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["ai_interviewer"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ai_interviewer"]
+
+[tool.ruff.format]
+quote-style = "double"
