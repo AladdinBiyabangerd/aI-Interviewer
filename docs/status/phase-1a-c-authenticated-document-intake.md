@@ -123,13 +123,13 @@ existing immutable version.
 
 ## Next part
 
-Phase 1A-D must begin only after explicit approval. Its order is:
+Phase 1A-D1 has now completed under
+[ADR 0013](../adr/0013-encrypted-immutable-candidate-source-text.md). The remaining
+order is:
 
-1. freeze the isolated parser adapter/version/resource/network contract;
-2. define immutable extracted-source versions and provenance to the exact document
-   version;
-3. execute only against released assets through the existing parser-release policy;
-4. validate bounded PDF/DOCX/text extraction failure modes;
-5. expose owner-scoped inspection and correction without invoking AI;
-6. integrate privacy export, retention, deletion, audit, and recovery;
-7. complete real-database, sandbox, security, and migration verification.
+1. implement the isolated parser adapter/version/resource/network contract;
+2. execute only against released assets through the existing parser-release policy;
+3. validate bounded PDF/DOCX/text extraction failure modes;
+4. expose owner-scoped inspection and correction without invoking AI;
+5. integrate privacy export, retention, deletion, audit, and recovery;
+6. complete real-database, sandbox, security, and migration verification.

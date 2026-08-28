@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$expectedSchemaRevision = "20260827_0007"
+$expectedSchemaRevision = "20260828_0009"
 
 $rawInspection = docker image inspect $Image
 if ($LASTEXITCODE -ne 0) {

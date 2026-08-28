@@ -112,6 +112,11 @@ class CandidateDocumentVersion(UUIDPrimaryKeyMixin, PersistenceBase):
             "file_asset_id",
             name="uq_candidate_document_versions_file_asset",
         ),
+        UniqueConstraint(
+            "id",
+            "owner_id",
+            name="uq_candidate_document_versions_id_owner",
+        ),
         ForeignKeyConstraint(
             ["document_id", "owner_id"],
             ["candidate_documents.id", "candidate_documents.owner_id"],

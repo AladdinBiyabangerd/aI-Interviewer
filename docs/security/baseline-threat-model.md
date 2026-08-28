@@ -219,4 +219,52 @@ Candidate-preparation web application, API, workers, PostgreSQL, object storage,
   Phase 0D work. The current conservative per-owner lock is not a substitute for that
   evidence.
 
+## Phase 1A-D1 controls implemented
+
+- Extracted source text has a dedicated owner-bound aggregate tied to one exact immutable
+  document version. Composite foreign keys prevent cross-owner lineage, while document
+  erasure and file retention cascade through encrypted revisions.
+- PostgreSQL stores only AES-256-GCM ciphertext, nonce, explicit rotation key ID, and a
+  context-bound HMAC digest/key ID. Authenticated additional data binds identity,
+  revision, origin, predecessor, exact parser provenance, counts, digest, and key ID;
+  metadata or ciphertext tampering fails decryption.
+- Parser-result persistence repeats the active account, draft preparation, current
+  purpose authorization, privacy/legal/retention snapshot, latest document version,
+  exact released asset, and active parser-release checks. Policy ID alone is
+  insufficient: adapter, version, isolation, media, byte limit, scan requirement,
+  category, purpose, and privacy policy must match.
+- Content is bounded by characters and UTF-8 bytes, requires LF newlines, and rejects
+  unsafe Unicode control/format/surrogate characters. Exact valid multilingual text is
+  retained without silent normalization.
+- Owner-level locking and unique constraints make exact parser retries idempotent. A
+  changed result/provenance conflicts and cannot overwrite the original extraction.
+- Database triggers reject source identity reassignment and every source-version update;
+  a separate trigger validates the reserved sequential correction chain.
+- Audit and outbox events contain only opaque identifiers and bounded parser metadata.
+  Plaintext, ciphertext, nonce, digest, document hash, counts, and object keys are
+  excluded.
+- This internal runtime has no parser, worker, HTTP route, correction, or AI connection.
+  Export/retention/recovery integration remains a mandatory D4 gate before product
+  traffic can create source text.
+
+## Phase 1A-D2.1 controls implemented
+
+- Each exact document version can create only one owner-bound extraction job. The job
+  snapshots the released asset, parser policy, privacy decision, retention rule, media,
+  byte length, and source digest; a database trigger prevents those identities from
+  being changed while status metadata moves.
+- Claims use `SKIP LOCKED`, a bounded five-minute lease, a fresh UUID fencing token, and
+  a bounded worker identifier. A stale worker cannot complete or fail a lease after it
+  has been reclaimed by another worker.
+- Attempts are capped at five. Only the explicit safe failure taxonomy is accepted;
+  transient parser/source failures use bounded exponential retry and input/policy
+  failures terminate without automatic replay. State constraints require a coherent
+  lock, result, error, and completion shape.
+- Job rows contain no bytes, object keys, filenames, parser exception text, or source
+  text. Scheduling and transitions emit only opaque IDs and allowlisted parser/status
+  metadata to audit/outbox channels.
+- D2.1 defines persistence and fencing only. No parser process, adapter, network access,
+  model call, or product route is enabled until the separately gated D2.2 sandbox is
+  implemented and verified.
+
 This threat model must be updated before each phase gate and whenever a new data type, vendor, trust boundary, or external audience is introduced.

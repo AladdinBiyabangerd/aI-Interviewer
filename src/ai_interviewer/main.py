@@ -20,10 +20,14 @@ from ai_interviewer.api.routes.privacy import router as privacy_router
 from ai_interviewer.candidate_inputs import (
     CandidateDocumentIntakeRuntime,
     CandidateDocumentRuntime,
+    CandidateExtractionJobRuntime,
     CandidateInputRuntime,
+    CandidateSourceTextRuntime,
     build_candidate_document_intakes,
     build_candidate_documents,
+    build_candidate_extraction_jobs,
     build_candidate_inputs,
+    build_candidate_source_texts,
 )
 from ai_interviewer.candidate_inputs.asset_references import (
     CandidateFileAssetReferenceLifecycle,
@@ -61,6 +65,8 @@ def create_app(
     candidate_inputs: CandidateInputRuntime | None = None,
     candidate_documents: CandidateDocumentRuntime | None = None,
     candidate_document_intakes: CandidateDocumentIntakeRuntime | None = None,
+    candidate_extraction_jobs: CandidateExtractionJobRuntime | None = None,
+    candidate_source_texts: CandidateSourceTextRuntime | None = None,
     jurisdiction_registry: JurisdictionPolicyRegistry | None = None,
     telemetry: TelemetryRuntime | None = None,
 ) -> FastAPI:
@@ -96,6 +102,17 @@ def create_app(
             resolved_file_security,
             resolved_candidate_documents,
         )
+    )
+    resolved_candidate_extraction_jobs = (
+        candidate_extraction_jobs
+        or build_candidate_extraction_jobs(
+            resolved_settings,
+            resolved_database,
+        )
+    )
+    resolved_candidate_source_texts = candidate_source_texts or build_candidate_source_texts(
+        resolved_settings,
+        resolved_database,
     )
     resolved_privacy = privacy or build_privacy_service(
         resolved_settings,
@@ -153,6 +170,8 @@ def create_app(
     app.state.candidate_inputs = resolved_candidate_inputs
     app.state.candidate_documents = resolved_candidate_documents
     app.state.candidate_document_intakes = resolved_candidate_document_intakes
+    app.state.candidate_extraction_jobs = resolved_candidate_extraction_jobs
+    app.state.candidate_source_texts = resolved_candidate_source_texts
     app.state.jurisdiction_registry = resolved_registry
     app.state.telemetry = resolved_telemetry
 

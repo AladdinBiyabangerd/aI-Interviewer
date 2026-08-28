@@ -2,7 +2,7 @@
 
 ## 1. Sənəd haqqında
 
-Bu sənəd AI Interviewer Platform layihəsində başlanğıcdan 27 avqust 2026-cı ilədək
+Bu sənəd AI Interviewer Platform layihəsində başlanğıcdan 28 avqust 2026-cı ilədək
 faktiki görülmüş işi vahid yerdə təsvir edir. Məqsəd kod bazasının hansı ardıcıllıqla
 qurulduğunu, hər mərhələnin niyə lazım olduğunu, hansı asılılıqlara söykəndiyini,
 nələrin yoxlandığını və nələrin hələ edilmədiyini aydın göstərməkdir.
@@ -43,29 +43,34 @@ Hazırda aşağıdakı hissələr tamamlanıb:
 | 1A-A | Tamamlanıb | Owner-bound preparation target context, privacy lifecycle və API |
 | 1A-B | Tamamlanıb | Immutable CV/JD document lineage, owner/asset invariants və lifecycle integration |
 | 1A-C | Tamamlanıb | Authenticated upload/paste, durable intake recovery və safe immutable attachment |
+| 1A-D1 | Tamamlanıb | AES-256-GCM encrypted immutable source-text lineage və exact parser provenance boundary |
+| 1A-D2.1 | Tamamlanıb | Durable extraction-job scheduling, lease fencing, bounded retry və safe failure taxonomy |
 | 0D-C-B2 | Pre-production-a təxirə salınıb | Real backend seçimi, 28 günlük canlı toplama və adlı təsdiqlər |
 | 0D-C-C və sonrası | Pre-production-a təxirə salınıb | Alertlər, incident məşqləri, traffic protection və production gate |
 
-Son tam verification snapshot-ı:
+Son tam local verification snapshot-ı (D1, 2026-08-28):
 
-- Python 3.12 altında ümumilikdə `318` test keçib.
-- Bunların `45`-i real PostgreSQL integration testidir.
-- Branch-aware coverage `95.43%`-dir; məcburi minimum `95%`-dir.
-- Strict mypy bütün `61` source faylı üçün keçib.
+- Python 3.12 altında ümumilikdə `329` test keçib.
+- Bunların `47`-si real PostgreSQL integration testidir.
+- Branch-aware coverage `95.03%`-dir; məcburi minimum `95%`-dir.
+- Strict mypy bütün `63` source faylı üçün keçib.
+- D2.1 əlavə olunduqdan sonra strict mypy `65` source faylı üçün də keçir; D2.1 unit
+  suite-i `8` yeni testdən ibarətdir.
 - Ruff lint və format yoxlamaları keçib.
-- Alembic-in tək cari schema revision-u `20260827_0007`-dir.
+- D2.1 unit suite-i əlavə `8` testlə keçir; tam PostgreSQL snapshot-u Docker mühərriki
+  əlçatan olduqdan sonra yenidən ölçüləcək. Cari Alembic schema revision-u
+  `20260828_0009`-dur.
 - Dependency lock, `uv pip check` və `pip-audit` keçib; məlum Python zəifliyi
   aşkarlanmayıb.
-- Son API və PostgreSQL image scan-lərində `HIGH/CRITICAL` nəticə `0` olub.
-- Runtime container `10001:10001` istifadəçisi, read-only root filesystem,
-  `cap-drop ALL` və `no-new-privileges` ilə smoke testdən keçib.
-- Son local rehearsal CycloneDX SBOM-u `91` komponentdən ibarət olub.
+- Migration round-trip və model parity `0008` ilə keçib. Docker Desktop işləmədiyi üçün
+  yeni backup/restore rehearsal və image scan bu snapshot-a daxil deyil; əvvəlki `0007`
+  release-image/rehearsal nəticələri tarixi sübut kimi saxlanılır.
 
-Vacib repository qeydi: hazırkı Git worktree-də layihə faylları hələ commit
-edilməyib və `git status` onları untracked göstərir. Ona görə lokal image-lərdə istifadə
-edilən rehearsal revision dəyərləri real Git release commit-i sayılmır. Production
-buraxılışından əvvəl repository tarixçəsi, review və imzalanmış release prosesi ayrıca
-qurulmalıdır.
+Repository GitHub-a `b2d4ed3` (`Complete Phase 1A-C authenticated document intake`)
+commit-i ilə push edilib. Phase 1A-D1 dəyişiklikləri həmin commit-dən sonrakı lokal,
+ayrıca review/commit vahididir və istifadəçinin göstərişinə uyğun GitHub-a push
+edilməyib. Lokal rehearsal hələ production release deyil; imzalanmış promotion,
+retained CI evidence və approval gate-i production-dan əvvəl məcburidir.
 
 ## 3. Məhsulun başa düşülməsi və dəyişməz guardrail-lər
 
@@ -1147,6 +1152,111 @@ edilməyib.
 [ADR 0012](adr/0012-durable-authenticated-document-intake.md) və
 [Phase 1A-C completion record](status/phase-1a-c-authenticated-document-intake.md).
 
+## 5.13 Phase 1A-D1 — Encrypted immutable source-text domain
+
+### Məqsəd və sərhəd
+
+Parser kitabxanası və untrusted document execution-u əlavə etməzdən əvvəl extracted
+text-in təhlükəsiz, owner-bound və reproducible persistence sərhədi quruldu. Bu alt
+mərhələ qəsdən parser işə salmır, HTTP source-text endpoint-i vermir və AI çağırmır.
+
+### Data modeli və kriptoqrafiya
+
+- `candidate_source_texts` exact bir `candidate_document_versions` sətri üçün maksimum
+  bir stable aggregate saxlayır. Composite FK owner-in document lineage boyunca eyni
+  qalmasını təmin edir.
+- `candidate_source_text_versions` append-only revision-lardır. Birinci revision yalnız
+  `parser_extraction`, sonrakılar yalnız sequential `user_correction` ola bilər.
+- Mətn PostgreSQL-ə plaintext yazılmır. AES-256-GCM ciphertext, 12-byte nonce və exact
+  field-encryption key ID saxlanır.
+- AAD owner, document/source/version ID-ləri, revision/origin/predecessor, parser policy,
+  adapter/version/isolation, count-lar, digest və key ID-ləri bağlayır. Metadata və ya
+  ciphertext başqa sətrə köçürülsə decryption fail closed edir.
+- Global SHA-256 əvəzinə owner/document kontekstli subject-HMAC və rotation key ID
+  saxlanır. Bu exact retry/integrity verir, amma common JD/CV text equality oracle
+  yaratmır.
+
+### Processing guard-ləri
+
+- Store zamanı account active, preparation draft və unexpired, target document version
+  latest, asset isə exact owner-matched `released` vəziyyətdə olmalıdır.
+- Asset media/byte length/SHA-256/parser policy/privacy/jurisdiction/retention snapshot-u
+  immutable document version-la yenidən müqayisə edilir.
+- Cari purpose authorization eyni privacy policy, jurisdiction, legal basis, retention
+  rule və delete-only action qaytarmalıdır.
+- Parser policy active və approved olmalı; ID, adapter, version, isolation, media,
+  maximum bytes, malware-scan flag, category, purpose və privacy policy tam uyğun
+  gəlməlidir.
+- Mətn 500,000 character və 2,000,000 UTF-8 byte ilə bounded-dir, yalnız LF newline
+  qəbul edir, NUL/CR/Unicode format-control/surrogate-ləri rədd edir. Etibarlı
+  multilingual text səssiz normalization olmadan round-trip edir.
+
+### Immutability, retry və lifecycle
+
+- Owner səviyyəsində lock və document-version unique constraint parallel exact retry-ni
+  bir result-a endirir. Eyni content/provenance idempotent-dir; fərqli nəticə conflict
+  verir və heç nə overwrite etmir.
+- DB trigger stable source identity-ni dəyişməyə və source version update-ə icazə
+  vermir. Ayrı trigger correction predecessor-in məhz əvvəlki ordinal olduğunu yoxlayır.
+- Exact document version account erasure və ya file retention zamanı silinəndə bütün
+  encrypted text lineage cascade olunur.
+- Encrypted data varkən `0008` downgrade fail closed edir.
+- Eyni transaction-da content-free audit və outbox evidence yaranır. Plaintext,
+  ciphertext, nonce, HMAC, document digest, object key və count-lar bu metadata-ya
+  düşmür.
+
+### Qəsdən növbəti gate-lərə saxlanılanlar
+
+- D2.2: isolated PDF/DOCX/TXT parser worker (D2.1 durable job contract artıq tamamlanıb);
+- D3: authenticated owner inspection və immutable correction append API-si;
+- D4: extracted-text access export, tam retention/recovery/audit və Phase 1A exit gate.
+
+Ətraflı qərar və sübut:
+[ADR 0013](adr/0013-encrypted-immutable-candidate-source-text.md) və
+[Phase 1A-D1 completion record](status/phase-1a-d1-encrypted-source-text-domain.md).
+
+## 5.14 Phase 1A-D2.1 — Durable extraction-job contract
+
+### Məqsəd və sərhəd
+
+Encrypted D1 source-text sərhədindən əvvəl untrusted parser üçün durable asynchronous
+iş müqaviləsi yaradıldı. Bu alt-mərhələ parser kitabxanası işə salmır, object bytes oxumur
+və extracted text yazmır; yalnız exact document version üçün job lifecycle-i qoruyur.
+
+### Job modeli və lease fencing
+
+- `candidate_extraction_jobs` hər exact `candidate_document_versions` sətri üçün bir
+  owner-bound job saxlayır. Document/file/policy/privacy/retention snapshot-ları
+  immutable-dir və database trigger ilə qorunur.
+- `pending -> processing -> retry/succeeded/failed` status-ları state constraint ilə
+  lock token, error code, source-text ID və completion timestamp ilə uyğunlaşdırılır.
+- Claim `FOR UPDATE SKIP LOCKED`, 5 dəqiqəlik lease, UUID fencing token və maksimum 5
+  attempt istifadə edir. Worker ID və lease token olmadan completion/failure qəbul edilmir.
+- Yalnız bounded failure taxonomy qəbul olunur. Transient parser/source xətaları capped
+  exponential retry alır; unsupported/corrupt/encrypted/empty/policy xətaları automatic
+  replay etmir.
+
+### Operational və privacy sərhədi
+
+- Schedule və transition əməliyyatları yalnız opaque ID, parser metadata, status, attempt
+  və safe error code-ları audit/outbox-a yazır. Bytes, object key, filename, raw exception
+  və source text heç bir operational metadata-ya düşmür.
+- Composite owner FK-lər, exact snapshot yoxlamaları və `ON DELETE CASCADE` document
+  lineage silinməsi zamanı pending/retry job-ları da təmizləyir.
+- Runtime privacy, file-security və application keyring konfiqurasiyası olmadan fail
+  closed olur; worker və public route hələ mövcud deyil.
+
+### Verification və növbəti gate
+
+- D2.1 unit tests, Ruff lint/format, strict mypy, Python compile və Alembic offline SQL
+  generation keçib. PostgreSQL migration parity, lease concurrency, stale-worker
+  fencing və restore rehearsal Docker Desktop əlçatan olduqda yenidən ölçülməlidir.
+- Növbəti düzgün hissə `1A-D2.2`-dir: `read_for_parser` üzərindən yalnız exact released
+  asset-i oxuyan, no-network/read-only/non-root resource-bounded PDF/DOCX/TXT worker.
+
+Ətraflı qərar və sübut: [ADR 0014](adr/0014-durable-candidate-extraction-jobs.md) və
+[Phase 1A-D2.1 completion record](status/phase-1a-d2-1-extraction-job-contract.md).
+
 ## 6. Hazırda mövcud HTTP API contract-ı
 
 | Method və route | Məqsəd | Scope/şərt |
@@ -1188,7 +1298,7 @@ API hələ aşağıdakı endpoint-ləri vermir:
 
 ## 7. Database schema inventory
 
-Hazırda `23` application table və Alembic-in `alembic_version` cədvəli var.
+Hazırda `26` application table və Alembic-in `alembic_version` cədvəli var.
 
 | Cədvəl | Mərhələ | Məsuliyyət və əsas invariant |
 |---|---|---|
@@ -1215,6 +1325,9 @@ Hazırda `23` application table və Alembic-in `alembic_version` cədvəli var.
 | `candidate_documents` | 1A-B | Stable per-preparation CV/JD aggregate və latest ordinal |
 | `candidate_document_versions` | 1A-B | DB-trigger immutable released-asset/privacy/retention snapshot |
 | `candidate_document_intakes` | 1A-C | Hashed-idempotent lease/retry/status və exact asset/version coordination |
+| `candidate_source_texts` | 1A-D1 | Exact document version üçün owner-bound encrypted text aggregate |
+| `candidate_source_text_versions` | 1A-D1 | AES-GCM encrypted immutable parser/correction revision və provenance |
+| `candidate_extraction_jobs` | 1A-D2.1 | Durable exact-version extraction status, lease fencing, retry və safe errors |
 | `alembic_version` | Alembic | Database-in cari schema revision-u |
 
 Migration chain:
@@ -1227,9 +1340,11 @@ Migration chain:
   -> 20260826_0005 candidate preparation context
   -> 20260827_0006 immutable candidate document versions
   -> 20260827_0007 authenticated document intakes
+  -> 20260827_0008 encrypted candidate source text
+  -> 20260828_0009 durable candidate extraction jobs
 ```
 
-API readiness exact `20260827_0007` revision-u tələb edir. Connected, amma başqa
+API readiness exact `20260828_0009` revision-u tələb edir. Connected, amma başqa
 revision-da olan database traffic üçün hazır sayılmır.
 
 ## 8. Security və privacy posture
@@ -1381,6 +1496,8 @@ Release verification aşağıdakıları yoxlayır:
 | [0010](adr/0010-feature-stable-mvp-before-hosted-reliability-baseline.md) | Feature-stable text MVP-dən sonra hosted reliability baseline | Qəbul edilib; production gate-ləri ləğv etmir |
 | [0011](adr/0011-immutable-candidate-document-lineage.md) | Released file asset üzərində immutable CV/JD lineage | Qəbul edilib |
 | [0012](adr/0012-durable-authenticated-document-intake.md) | Hashed-idempotent, lease-based upload/paste saga və exact asset recovery | Qəbul edilib |
+| [0013](adr/0013-encrypted-immutable-candidate-source-text.md) | AES-256-GCM encrypted immutable source-text lineage və parser provenance | Qəbul edilib |
+| [0014](adr/0014-durable-candidate-extraction-jobs.md) | Exact-version extraction job, lease fencing və bounded retry contract | Qəbul edilib |
 
 ## 11. Repository xəritəsi
 
@@ -1396,7 +1513,7 @@ Release verification aşağıdakıları yoxlayır:
 |   |-- runbooks/               Backup, release, file və telemetry əməliyyatları
 |   |-- security/               Threat model və data inventory
 |   `-- status/                 Hər tamamlanmış mərhələnin exit record-u
-|-- migrations/versions/        Yeddi forward schema revision-u
+|-- migrations/versions/        Doqquz forward schema revision-u
 |-- scripts/                    Verification və restore rehearsal
 |-- src/ai_interviewer/
 |   |-- api/                    HTTP route/error contract-ları
@@ -1414,12 +1531,12 @@ Release verification aşağıdakıları yoxlayır:
 `-- uv.lock                     Reproducible dependency lock
 ```
 
-Bu sənəd yazılan anda təxminən:
+Bu sənəd yazılan anda:
 
-- `57` Python source faylı;
-- `26` Python test faylı;
-- `6` Alembic revision faylı;
-- bu sənədlə birlikdə `36` Markdown sənədi;
+- `65` Python source faylı;
+- `32` Python test faylı;
+- `9` Alembic revision faylı;
+- `42` Markdown sənədi;
 - `4` operational PowerShell/Python script mövcuddur.
 
 ## 12. Qəsdən hələ edilməyənlər
@@ -1428,8 +1545,7 @@ Aşağıdakılar yarımçıq və ya placeholder kimi yazılmayıb; uyğun gate g
 başlanmayıb:
 
 - frontend və candidate onboarding UI;
-- public CV/JD upload/paste API;
-- document parser worker və extracted text correction flow;
+- document parser worker, extracted-text inspection və correction flow;
 - CV/JD profiling;
 - company/role/round knowledge base;
 - global source policy registry və ingestion connector-ları;
@@ -1449,28 +1565,32 @@ SLO ölçüdən əvvəl, alert isə owner və target-dən əvvəl yaradılmasın
 
 ## 13. Cari stop point — niyə növbəti hissə avtomatik davam etmir
 
-Cari tamamlanmış məhsul vahidi `1A-C`-dir. İstifadəçinin təsdiq etdiyi
+Cari tamamlanmış məhsul vahidi `1A-D2.1`-dir. İstifadəçinin təsdiq etdiyi
 [ADR 0010](adr/0010-feature-stable-mvp-before-hosted-reliability-baseline.md) qərarına
 görə hosted 28 günlük baseline və ondan asılı 0D production gate-ləri text MVP-nin
 route/query/contract səthi feature-stable olana qədər təxirə salınıb. Onlar ləğv
 edilməyib və production-dan əvvəl mütləq tamamlanmalıdır.
 
-Hazırkı düzgün dayanacaq `1A-D` sandboxed extraction contract-ından əvvəldir.
-1A-C-də parser, extracted text, PII-redacted representation və correction qəsdən
-yazılmayıb. Növbəti böyük hissəyə başlamazdan əvvəl istifadəçinin təsdiqi gözlənilir.
+Hazırkı düzgün dayanacaq `1A-D2.2` isolated parser worker-dən əvvəldir. 1A-D1-də
+encrypted immutable source-text persistence, D2.1-də isə durable extraction job/lease/
+retry contract qurulub; parser, worker, HTTP inspection/correction, PII-redacted
+representation və AI emalı qəsdən yazılmayıb. Növbəti hissəyə başlamazdan əvvəl
+istifadəçinin təsdiqi gözlənilir.
 
 ## 14. Düzgün növbəti ardıcıllıq
 
-### 1A-D — Sandboxed extraction
+### 1A-D2.2 — Isolated parser execution
 
-**Dependencies:** tamamlanmış 1A-C durable intake və clean immutable version; 0C-C-də
-approved exact parser adapter/version/isolation policy.  
-**İş:** released asset-i resource-bounded, no-network worker-də parse etmək; extracted
-source version-u exact document version-a bağlamaq; bounded failure/status və owner
-inspection/correction contract-ı; privacy export/retention/deletion integration.  
+**Dependencies:** tamamlanmış 1A-C durable intake/clean immutable version, 1A-D1
+encrypted source-text domain və 1A-D2.1 durable extraction job/lease/retry contract;
+0C-C-də approved exact parser adapter/version/isolation policy.
+**İş:** released asset-i yalnız `read_for_parser` sərhədindən resource-bounded, read-only,
+non-root, no-network worker-ə vermək; PDF/DOCX/TXT adapterlərini ayrıca versionlamaq;
+bounded parser error-larını D2.1 taxonomy-sinə map etmək və crash-safe D1 persistence
+yaratmaq.
 **Completion:** corrupt, password-protected, parser-timeout/resource-limit və malicious
-fixture-lər fail closed edir; source provenance itmir; user AI processing-dən əvvəl
-extracted text-i görə və correction version-u yarada bilir; heç bir model call edilmir.
+fixture-lər fail closed edir; yalnız exact approved parser nəticəsi D1-ə yaza bilir;
+retry ikinci extraction yaratmır və heç bir model call edilmir.
 
 ### Təxirə salınmış mandatory pre-production gate-lər
 
@@ -1517,9 +1637,11 @@ foundation-ıdır: reproducible runtime, PostgreSQL transaction/migration, OIDC 
 sərhədi, privacy lifecycle, encrypted/quarantined file contract, hardened release,
 payload-blind telemetry, sübuta bağlı reliability measurement tooling və ilk
 owner-bound preparation target aggregate-i, immutable CV/JD metadata lineage-i və
-recoverable authenticated upload/paste saga-sı.
+recoverable authenticated upload/paste saga-sı, encrypted immutable source-text
+lineage-i və durable extraction-job contract-ı.
 
 Ən vacib prinsip qorunub: sonrakı mərhələnin funksiyası əvvəlki gate tamamlanmadan
-kod bazasına gətirilməyib. Hazırkı düzgün dayanacaq 1A-C-dən sonra, 1A-D-dən əvvəldir.
+kod bazasına gətirilməyib. Hazırkı düzgün dayanacaq 1A-D2.1-dən sonra, 1A-D2.2-dən
+əvvəldir.
 Hosted reliability işi daha gec ediləcək, amma production gate kimi roadmap və ADR-də
 açıq qalır.

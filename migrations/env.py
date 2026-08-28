@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ai_interviewer.candidate_inputs import (
     document_models,  # noqa: F401
+    extraction_models,  # noqa: F401
     intake_models,  # noqa: F401
+    source_text_models,  # noqa: F401
 )
 from ai_interviewer.candidate_inputs import models as candidate_input_models  # noqa: F401
 from ai_interviewer.core.config import Settings
