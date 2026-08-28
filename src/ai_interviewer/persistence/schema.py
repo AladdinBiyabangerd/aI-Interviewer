@@ -1,6 +1,6 @@
 """Release-to-schema compatibility contract."""
 
-EXPECTED_SCHEMA_REVISION = "20260827_0007"
+EXPECTED_SCHEMA_REVISION = "20260828_0009"
 
 # Stable, application-owned PostgreSQL advisory-lock key for schema releases.
 # Changing this value would allow incompatible migration runners to overlap.
