@@ -2,7 +2,7 @@
 
 ## 1. Sənəd haqqında
 
-Bu sənəd AI Interviewer Platform layihəsində başlanğıcdan 28 avqust 2026-cı ilədək
+Bu sənəd AI Interviewer Platform layihəsində başlanğıcdan 30 avqust 2026-cı ilədək
 faktiki görülmüş işi vahid yerdə təsvir edir. Məqsəd kod bazasının hansı ardıcıllıqla
 qurulduğunu, hər mərhələnin niyə lazım olduğunu, hansı asılılıqlara söykəndiyini,
 nələrin yoxlandığını və nələrin hələ edilmədiyini aydın göstərməkdir.
@@ -45,32 +45,34 @@ Hazırda aşağıdakı hissələr tamamlanıb:
 | 1A-C | Tamamlanıb | Authenticated upload/paste, durable intake recovery və safe immutable attachment |
 | 1A-D1 | Tamamlanıb | AES-256-GCM encrypted immutable source-text lineage və exact parser provenance boundary |
 | 1A-D2.1 | Tamamlanıb | Durable extraction-job scheduling, lease fencing, bounded retry və safe failure taxonomy |
+| 1A-D2.2 | Tamamlanıb | No-network, resource-bounded isolated PDF/DOCX/TXT parser worker |
 | 0D-C-B2 | Pre-production-a təxirə salınıb | Real backend seçimi, 28 günlük canlı toplama və adlı təsdiqlər |
 | 0D-C-C və sonrası | Pre-production-a təxirə salınıb | Alertlər, incident məşqləri, traffic protection və production gate |
 
-Son tam local verification snapshot-ı (D1, 2026-08-28):
+Son tam local verification snapshot-ı (D2.2, 2026-08-30):
 
-- Python 3.12 altında ümumilikdə `329` test keçib.
-- Bunların `47`-si real PostgreSQL integration testidir.
-- Branch-aware coverage `95.03%`-dir; məcburi minimum `95%`-dir.
-- Strict mypy bütün `63` source faylı üçün keçib.
-- D2.1 əlavə olunduqdan sonra strict mypy `65` source faylı üçün də keçir; D2.1 unit
-  suite-i `8` yeni testdən ibarətdir.
+- Python 3.12 altında `not integration` filtri ilə `324` test keçib, `1`-i (POSIX-only
+  signal-kill ssenarisi) Windows-da skip olunub.
+- Strict mypy indi `platform = "linux"` hədəfi ilə `69` source faylı üçün keçir; bu,
+  production/CI hədəfi olan Linux üçün POSIX-only `resource`/`os.getuid` davranışını
+  doğru yoxlayır.
 - Ruff lint və format yoxlamaları keçib.
-- D2.1 unit suite-i əlavə `8` testlə keçir; tam PostgreSQL snapshot-u Docker mühərriki
-  əlçatan olduqdan sonra yenidən ölçüləcək. Cari Alembic schema revision-u
-  `20260828_0009`-dur.
-- Dependency lock, `uv pip check` və `pip-audit` keçib; məlum Python zəifliyi
-  aşkarlanmayıb.
-- Migration round-trip və model parity `0008` ilə keçib. Docker Desktop işləmədiyi üçün
-  yeni backup/restore rehearsal və image scan bu snapshot-a daxil deyil; əvvəlki `0007`
-  release-image/rehearsal nəticələri tarixi sübut kimi saxlanılır.
+- `not integration` filtri altında ümumi coverage `72.31%`-dir; bu, layihənin əvvəldən
+  sabit qaydasına uyğundur — `95%` minimum yalnız real PostgreSQL-ə qarşı tam suite
+  işlədikdə ölçülür. Docker Desktop bu handoff zamanı əlçatan olmadığı üçün real
+  PostgreSQL integration suite-i (2 yeni D2.2 testi daxil olmaqla) yenə işlədilməyib;
+  D2.1-in özü də eyni məhdudiyyəti qeyd etmişdi.
+- Yeni `pypdf` və `python-docx` runtime asılılıqları əlavə edildi; hər ikisi `uv add`
+  ilə lock-landı.
+- Alembic schema revision dəyişməyib (`20260828_0009`); D2.2 heç bir yeni cədvəl və ya
+  sütun əlavə etmir.
 
 Repository GitHub-a `b2d4ed3` (`Complete Phase 1A-C authenticated document intake`)
-commit-i ilə push edilib. Phase 1A-D1 dəyişiklikləri həmin commit-dən sonrakı lokal,
-ayrıca review/commit vahididir və istifadəçinin göstərişinə uyğun GitHub-a push
-edilməyib. Lokal rehearsal hələ production release deyil; imzalanmış promotion,
-retained CI evidence və approval gate-i production-dan əvvəl məcburidir.
+commit-i ilə push edilib. Phase 1A-D1, 1A-D2.1 və 1A-D2.2 dəyişiklikləri həmin
+commit-dən sonrakı lokal, ayrıca review/commit vahidləridir və istifadəçinin
+göstərişinə uyğun GitHub-a push edilməyib. Lokal rehearsal hələ production release
+deyil; imzalanmış promotion, retained CI evidence və approval gate-i production-dan
+əvvəl məcburidir.
 
 ## 3. Məhsulun başa düşülməsi və dəyişməz guardrail-lər
 
@@ -1256,6 +1258,102 @@ və extracted text yazmır; yalnız exact document version üçün job lifecycle
 
 Ətraflı qərar və sübut: [ADR 0014](adr/0014-durable-candidate-extraction-jobs.md) və
 [Phase 1A-D2.1 completion record](status/phase-1a-d2-1-extraction-job-contract.md).
+
+## 5.15 Phase 1A-D2.2 — Isolated parser worker
+
+### Məqsəd və sərhəd
+
+D2.1-in yaratdığı fenced job müqaviləsi üzərində real parser icrası əlavə edildi:
+exact released asset bytes-ı `read_for_parser` sərhədindən oxuyub, no-network və
+resource-bounded uşaq prosesdə parse edib, nəticəni D1 encrypted source-text
+sərhədindən keçirib D2.1 job-unu bağlamaq. Heç bir yeni cədvəl və ya sütun əlavə
+olunmayıb.
+
+### Yeni `extraction_runtime` paketi
+
+- `ai_interviewer.extraction_runtime` `candidate_inputs`-dan tam asılı olmayan yeni
+  top-level paketdir. Bu paketin import edilməsi SQLAlchemy, boto3, kriptoqrafiya və ya
+  FastAPI-ni yükləmir — isolated uşaq proses yalnız interpreter, `pypdf` və
+  `python-docx` yükləyir.
+- Bu ayrılma həm performans, həm təhlükəsizlik üçündür: hər spawn zamanı bütün
+  `candidate_inputs` paketinin (SQLAlchemy engine, boto3 client class-ları, kriptoqrafiya
+  daxil olmaqla) yenidən import edilməsinin qarşısını alır və isolated prosesin real
+  attack surface-ini azaldır.
+
+### Adapter-lər
+
+- `isolated-pdf-parser`, `isolated-docx-parser`, `isolated-text-parser` (versiya `1`)
+  bytes-dan sanitised Unicode text qaytaran pure funksiyalardır.
+- Çıxış D1-in tam content müqaviləsinə (LF newline, control/format/surrogate
+  simvolların qadağan olunması, 500,000 simvol limiti) uyğunlaşdırılır.
+- Encrypted PDF, invalid UTF-8, corrupt container və boş extracted text closed bir
+  error taxonomy-yə (`input_unsupported`, `input_corrupt`, `input_encrypted`,
+  `input_empty`, `resource_exceeded`) map olunur.
+
+### İzolyasiya sərhədi
+
+- `run_isolated_extraction` adapter-i `multiprocessing` `spawn` uşaq prosesində
+  işlədir — `fork` yox, çünki `spawn` valideyn prosesin açıq socket, database
+  connection və thread-lərini uşağa ötürmür.
+- Valideyn wall-clock timeout tətbiq edir; gözlənilməz exit `parser_crashed`,
+  signal-la öldürülmüş exit (yalnız POSIX) `resource_exceeded` kimi təsnif olunur.
+- Uşaq proses adapter kodu işə düşməzdən əvvəl CPU/memory/file-size resource
+  limit-lərini aşağı salır (yalnız POSIX; production hədəfi Linux container-dir),
+  socket modulunu deaktiv edir və root kimi işləyirsə davam etməkdən imtina edir.
+- Process sərhədini keçən nəticə ya sanitised text, ya da bir fixed string code-dur —
+  heç vaxt raw exception, traceback və ya qismən content deyil.
+
+### Worker
+
+- `CandidateExtractionWorker` mövcud üç sərhədi (`claim_jobs`, `read_for_parser`,
+  `store_parser_extraction`) bir exact claimed job üçün zəncirləyir və nəticəni
+  `mark_succeeded`/`mark_failed`-ə cari lease token ilə ötürür.
+- Release-boundary xətası `source_unavailable`-a, isolation xətası öz kodu ilə, D1
+  persistence-dəki stale-policy conflict-i `policy_unavailable`-a map olunur.
+- Worker özü heç vaxt object storage-a sorğu vermir və ya source text-i birbaşa yazmır.
+
+### mypy platform hədəfi
+
+- `[tool.mypy]` konfiqurasiyasına `platform = "linux"` əlavə olundu, çünki production
+  hədəfi yalnız Linux container-dir. Bu, `resource` və `os.getuid` kimi POSIX-only
+  standard library davranışının Windows-da development zamanı da düzgün yoxlanmasını
+  təmin edir.
+
+### Deliberately not implemented
+
+- Worker-i davamlı işlədən supervisor proses və ya CLI hələ yoxdur; `claim_deletion_tasks`
+  üçün də hələ belə bir runner olmadığı üçün bu, mövcud presedentə uyğundur.
+- Owner-un source text-i görməsi/düzəlişi və product route hələ D3/D4-dür.
+- Kernel-səviyyəli sandboxing (seccomp, network namespace, cgroup) tətbiq olunmayıb;
+  izolyasiya ayrı `spawn` prosesi, resource limit və deaktiv socket modulu ilə
+  təmin olunur. Daha güclü OS-səviyyəli izolyasiya container runtime-ın operational
+  qərarıdır, tətbiq kodu qərarı deyil.
+
+### Verification
+
+- `not integration` filtri ilə `324` test keçib, `1`-i (POSIX-only signal-kill
+  ssenarisi) Windows-da skip olunub.
+- Strict mypy `platform = "linux"` hədəfi ilə `69` source faylı üçün keçir.
+- Ruff lint və format yoxlamaları keçib.
+- İki yeni integration test (`tests/integration/test_extraction_worker.py`) real
+  database, file-security və source-text sərhədləri ilə end-to-end success (text
+  document) və end-to-end failure (corrupt synthetic PDF) ssenarilərini yoxlayır.
+  Docker Desktop bu handoff zamanı əlçatan olmadığı üçün bunlar hazırda lokal skip
+  olunur; D2.1-in özü də eyni PostgreSQL-bağlı boşluğu qeyd etmişdi.
+- Yeni `pypdf` və `python-docx` asılılıqları `uv add` ilə lock-landı; heç bir yeni
+  Alembic migration tələb olunmadı (schema revision `20260828_0009` olaraq qalır).
+
+### Next part
+
+Phase 1A-D3 (owner inspection və correction) bu müqavilə qəbul olunduqdan sonra
+başlaya bilər: authenticated owner-scoped source-text oxunuşu, safe display/download
+müqaviləsi və optimistic/idempotent immutable correction append. Owner-visible source
+text hazır olmadan heç bir AI processing başlaya bilməz.
+
+Ətraflı qərar və sübut: [ADR 0015](adr/0015-isolated-parser-worker.md) və
+[Phase 1A-D2.2 completion record](status/phase-1a-d2-2-isolated-parser-worker.md).
+
+Stop here until the next explicit continuation request.
 
 ## 6. Hazırda mövcud HTTP API contract-ı
 
