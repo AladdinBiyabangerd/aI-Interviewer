@@ -50,6 +50,10 @@ class CandidateSourceTextConflictError(RuntimeError):
     """A parser result conflicts with document, policy, or existing text state."""
 
 
+class CandidateSourceTextPreconditionError(RuntimeError):
+    """A correction's expected aggregate version does not match the current one."""
+
+
 @dataclass(frozen=True, slots=True)
 class ParserExecutionIdentity:
     parser_release_policy_id: UUID
@@ -107,7 +111,20 @@ class CandidateSourceTextRuntime(Protocol):
     async def get_source_text(
         self,
         account_id: UUID,
+        preparation_id: UUID,
         document_version_id: UUID,
+    ) -> CandidateSourceTextRecord: ...
+
+    async def append_correction(
+        self,
+        account_id: UUID,
+        preparation_id: UUID,
+        document_version_id: UUID,
+        content: str,
+        expected_version: int,
+        request_id: str | None,
+        *,
+        now: datetime | None = None,
     ) -> CandidateSourceTextRecord: ...
 
 
@@ -134,9 +151,25 @@ class FailClosedCandidateSourceTextService:
     async def get_source_text(
         self,
         account_id: UUID,
+        preparation_id: UUID,
         document_version_id: UUID,
     ) -> CandidateSourceTextRecord:
-        del account_id, document_version_id
+        del account_id, preparation_id, document_version_id
+        self._unavailable()
+
+    async def append_correction(
+        self,
+        account_id: UUID,
+        preparation_id: UUID,
+        document_version_id: UUID,
+        content: str,
+        expected_version: int,
+        request_id: str | None,
+        *,
+        now: datetime | None = None,
+    ) -> CandidateSourceTextRecord:
+        del account_id, preparation_id, document_version_id, content, request_id, now
+        del expected_version
         self._unavailable()
 
 
@@ -337,13 +370,14 @@ class CandidateSourceTextService:
             session.add_all((source_text, text_version))
             await session.flush()
             profile, _ = await require_privacy_profile(session, account_id, now=recorded_at)
-            await self._record_creation(
+            await self._record_version_event(
                 session,
                 source_text=source_text,
                 text_version=text_version,
                 profile=profile,
                 request_id=request_id,
                 occurred_at=recorded_at,
+                action="candidate_source_text.parser_extraction_stored",
             )
             await session.flush()
             return StoreParserExtractionResult(
@@ -354,26 +388,261 @@ class CandidateSourceTextService:
     async def get_source_text(
         self,
         account_id: UUID,
+        preparation_id: UUID,
         document_version_id: UUID,
     ) -> CandidateSourceTextRecord:
         async with self._database.transaction() as session:
-            document_version = await session.scalar(
-                select(CandidateDocumentVersion).where(
-                    CandidateDocumentVersion.id == document_version_id,
-                    CandidateDocumentVersion.owner_id == account_id,
-                )
+            document_version, _, _ = await self._owned_lineage(
+                session,
+                account_id,
+                preparation_id,
+                document_version_id,
             )
-            if document_version is None:
-                raise CandidateSourceTextNotFoundError("candidate source text was not found")
             source_text = await session.scalar(
                 select(CandidateSourceText).where(
-                    CandidateSourceText.document_version_id == document_version_id,
+                    CandidateSourceText.document_version_id == document_version.id,
                     CandidateSourceText.owner_id == account_id,
                 )
             )
             if source_text is None:
                 raise CandidateSourceTextNotFoundError("candidate source text was not found")
             return await self._record(session, source_text)
+
+    async def append_correction(
+        self,
+        account_id: UUID,
+        preparation_id: UUID,
+        document_version_id: UUID,
+        content: str,
+        expected_version: int,
+        request_id: str | None,
+        *,
+        now: datetime | None = None,
+    ) -> CandidateSourceTextRecord:
+        content_bytes, character_count, line_count = self._validate_content(content)
+        corrected_at = now or datetime.now(UTC)
+
+        async with self._database.transaction() as session:
+            account = await session.scalar(
+                select(Account).where(Account.id == account_id).with_for_update()
+            )
+            if account is None or account.status != "active":
+                raise CandidateSourceTextConflictError("the account cannot process documents")
+
+            document_version, document, preparation = await self._owned_lineage(
+                session,
+                account_id,
+                preparation_id,
+                document_version_id,
+                lock=True,
+            )
+            self._require_correctable_document(
+                preparation,
+                document,
+                document_version,
+                corrected_at,
+            )
+
+            decision = await authorize_processing(
+                session,
+                account_id=account_id,
+                data_category=DATA_CATEGORY,
+                purpose=PROCESSING_PURPOSE,
+                now=corrected_at,
+            )
+            if (
+                decision.retention_action != "delete"
+                or decision.privacy_policy_version_id != document_version.privacy_policy_version_id
+                or decision.jurisdiction_code != document_version.jurisdiction_code
+                or decision.legal_basis != document_version.legal_basis
+                or decision.retention_rule_id != document_version.retention_rule_id
+            ):
+                raise CandidateSourceTextConflictError(
+                    "the document no longer matches the active privacy decision"
+                )
+
+            source_text = await session.scalar(
+                select(CandidateSourceText)
+                .where(
+                    CandidateSourceText.document_version_id == document_version.id,
+                    CandidateSourceText.owner_id == account_id,
+                )
+                .with_for_update()
+            )
+            if source_text is None:
+                raise CandidateSourceTextNotFoundError("candidate source text was not found")
+
+            latest_version = await session.scalar(
+                select(CandidateSourceTextVersion).where(
+                    CandidateSourceTextVersion.source_text_id == source_text.id,
+                    CandidateSourceTextVersion.version_number == source_text.latest_version_number,
+                )
+            )
+            if latest_version is None:
+                raise CandidateSourceTextUnavailableError("source-text lineage is incomplete")
+
+            if expected_version < 1:
+                raise CandidateSourceTextPreconditionError("source-text version changed")
+            if source_text.version != expected_version:
+                if source_text.version == expected_version + 1 and self._is_repeat_correction(
+                    source_text,
+                    document_version,
+                    latest_version,
+                    content,
+                    expected_version + 1,
+                ):
+                    return await self._record(session, source_text)
+                raise CandidateSourceTextPreconditionError("source-text version changed")
+
+            new_version_number = source_text.latest_version_number + 1
+            text_version_id = uuid7()
+            digest_key_id = self._keyring.active_key_id("subject_hmac")
+            content_digest = self._keyring.hmac_digest(
+                "subject_hmac",
+                self._content_digest_material(account_id, document_version.id, content_bytes),
+            )
+            encryption_key_id = self._keyring.active_key_id("field_encryption")
+            aad = self._version_aad(
+                text_version_id=text_version_id,
+                source_text_id=source_text.id,
+                owner_id=account_id,
+                document_version_id=document_version.id,
+                version_number=new_version_number,
+                origin="user_correction",
+                previous_version_id=latest_version.id,
+                parser=None,
+                character_count=character_count,
+                utf8_byte_count=len(content_bytes),
+                line_count=line_count,
+                content_digest=content_digest,
+                content_digest_key_id=digest_key_id,
+                content_encryption_key_id=encryption_key_id,
+            )
+            encrypted = self._keyring.encrypt_field(content, aad=aad)
+            if encrypted.key_id != encryption_key_id:
+                raise CandidateSourceTextUnavailableError("field-encryption key changed")
+
+            text_version = CandidateSourceTextVersion(
+                id=text_version_id,
+                owner_id=account_id,
+                source_text_id=source_text.id,
+                version_number=new_version_number,
+                origin="user_correction",
+                previous_version_id=latest_version.id,
+                parser_release_policy_id=None,
+                parser_adapter=None,
+                parser_version=None,
+                isolation_profile=None,
+                character_count=character_count,
+                utf8_byte_count=len(content_bytes),
+                line_count=line_count,
+                content_digest=content_digest,
+                content_digest_key_id=digest_key_id,
+                content_ciphertext=encrypted.ciphertext,
+                content_nonce=encrypted.nonce,
+                content_encryption_key_id=encrypted.key_id,
+                created_at=corrected_at,
+            )
+            source_text.latest_version_number = new_version_number
+            source_text.updated_at = corrected_at
+            session.add(text_version)
+            await session.flush()
+            profile, _ = await require_privacy_profile(session, account_id, now=corrected_at)
+            await self._record_version_event(
+                session,
+                source_text=source_text,
+                text_version=text_version,
+                profile=profile,
+                request_id=request_id,
+                occurred_at=corrected_at,
+                action="candidate_source_text.correction_appended",
+            )
+            await session.flush()
+            return await self._record(session, source_text)
+
+    async def _owned_lineage(
+        self,
+        session: AsyncSession,
+        account_id: UUID,
+        preparation_id: UUID,
+        document_version_id: UUID,
+        *,
+        lock: bool = False,
+    ) -> tuple[CandidateDocumentVersion, CandidateDocument, CandidatePreparation]:
+        version_statement = select(CandidateDocumentVersion).where(
+            CandidateDocumentVersion.id == document_version_id,
+            CandidateDocumentVersion.owner_id == account_id,
+        )
+        if lock:
+            version_statement = version_statement.with_for_update()
+        document_version = await session.scalar(version_statement)
+        if document_version is None:
+            raise CandidateSourceTextNotFoundError("candidate source text was not found")
+
+        document_statement = select(CandidateDocument).where(
+            CandidateDocument.id == document_version.document_id,
+            CandidateDocument.owner_id == account_id,
+        )
+        if lock:
+            document_statement = document_statement.with_for_update()
+        document = await session.scalar(document_statement)
+        if document is None:
+            raise CandidateSourceTextNotFoundError("candidate source text was not found")
+
+        preparation_statement = select(CandidatePreparation).where(
+            CandidatePreparation.id == preparation_id,
+            CandidatePreparation.owner_id == account_id,
+        )
+        if lock:
+            preparation_statement = preparation_statement.with_for_update()
+        preparation = await session.scalar(preparation_statement)
+        if preparation is None or document.preparation_id != preparation_id:
+            raise CandidateSourceTextNotFoundError("candidate source text was not found")
+        return document_version, document, preparation
+
+    @staticmethod
+    def _require_correctable_document(
+        preparation: CandidatePreparation,
+        document: CandidateDocument,
+        document_version: CandidateDocumentVersion,
+        evaluated_at: datetime,
+    ) -> None:
+        if preparation.status != "draft":
+            raise CandidateSourceTextConflictError("archived documents cannot be corrected")
+        if (
+            preparation.retain_until <= evaluated_at
+            or preparation.retention_action != "delete"
+            or preparation.privacy_policy_version_id != document_version.privacy_policy_version_id
+            or preparation.jurisdiction_code != document_version.jurisdiction_code
+        ):
+            raise CandidateSourceTextConflictError(
+                "the preparation privacy snapshot is no longer processable"
+            )
+        if document.latest_version_number != document_version.version_number:
+            raise CandidateSourceTextConflictError(
+                "only the latest document version can be corrected"
+            )
+        if document_version.retain_until <= evaluated_at:
+            raise CandidateSourceTextConflictError("the document retention deadline has passed")
+
+    def _is_repeat_correction(
+        self,
+        source_text: CandidateSourceText,
+        document_version: CandidateDocumentVersion,
+        latest_version: CandidateSourceTextVersion,
+        content: str,
+        expected_next_version_number: int,
+    ) -> bool:
+        if (
+            latest_version.origin != "user_correction"
+            or latest_version.version_number != expected_next_version_number
+        ):
+            return False
+        try:
+            record = self._version_record(source_text, document_version, latest_version)
+        except CandidateSourceTextUnavailableError:
+            return False
+        return record.content == content
 
     @staticmethod
     def _validate_content(content: str) -> tuple[bytes, int, int]:
@@ -679,7 +948,7 @@ class CandidateSourceTextService:
         )
 
     @staticmethod
-    async def _record_creation(
+    async def _record_version_event(
         session: AsyncSession,
         *,
         source_text: CandidateSourceText,
@@ -687,6 +956,7 @@ class CandidateSourceTextService:
         profile: PrivacyProfile,
         request_id: str | None,
         occurred_at: datetime,
+        action: str,
     ) -> None:
         safe_details = {
             "origin": text_version.origin,
@@ -700,7 +970,7 @@ class CandidateSourceTextService:
             profile=profile,
             occurred_at=occurred_at,
             actor_id=None,
-            action="candidate_source_text.parser_extraction_stored",
+            action=action,
             resource_type="candidate_source_text_version",
             resource_id=text_version.id,
             owner_id=source_text.owner_id,
@@ -712,7 +982,7 @@ class CandidateSourceTextService:
             NewOutboxEvent(
                 aggregate_type="candidate_source_text",
                 aggregate_id=source_text.id,
-                event_type="candidate_source_text.parser_extraction_stored",
+                event_type=action,
                 owner_id=source_text.owner_id,
                 payload={
                     "candidate_source_text_id": str(source_text.id),

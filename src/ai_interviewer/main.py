@@ -17,6 +17,7 @@ from ai_interviewer.api.routes.health import router as health_router
 from ai_interviewer.api.routes.identity import router as identity_router
 from ai_interviewer.api.routes.preparations import router as preparations_router
 from ai_interviewer.api.routes.privacy import router as privacy_router
+from ai_interviewer.api.routes.source_texts import router as source_texts_router
 from ai_interviewer.candidate_inputs import (
     CandidateDocumentIntakeRuntime,
     CandidateDocumentRuntime,
@@ -208,6 +209,7 @@ def create_app(
     app.include_router(preparations_router, prefix="/api/v1")
     app.include_router(document_intakes_router, prefix="/api/v1")
     app.include_router(documents_router, prefix="/api/v1")
+    app.include_router(source_texts_router, prefix="/api/v1")
     return app
 
 

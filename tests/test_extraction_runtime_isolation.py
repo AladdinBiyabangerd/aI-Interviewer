@@ -55,8 +55,19 @@ def _die_by_signal(
     os.kill(os.getpid(), signal.SIGKILL)
 
 
+# A generous, test-only wall clock: under a full-suite/coverage run, spawning a fresh
+# interpreter and importing pypdf/python-docx can occasionally exceed the 25s
+# production default on a loaded machine. This does not change the production limit.
+_GENEROUS_TEST_LIMITS = IsolationLimits(wall_clock_seconds=90.0)
+
+
 def test_run_isolated_extraction_returns_sanitized_text() -> None:
-    text = run_isolated_extraction(TEXT_ADAPTER, TEXT_ADAPTER_VERSION, b"hello\r\nworld")
+    text = run_isolated_extraction(
+        TEXT_ADAPTER,
+        TEXT_ADAPTER_VERSION,
+        b"hello\r\nworld",
+        limits=_GENEROUS_TEST_LIMITS,
+    )
     assert text == "hello\nworld"
 
 
@@ -76,7 +87,7 @@ def test_run_isolated_extraction_maps_adapter_failures(
     code: str,
 ) -> None:
     with pytest.raises(IsolationExecutionError) as exc_info:
-        run_isolated_extraction(adapter, version, content)
+        run_isolated_extraction(adapter, version, content, limits=_GENEROUS_TEST_LIMITS)
     assert exc_info.value.code == code
 
 

@@ -21,6 +21,7 @@ from ai_interviewer.candidate_inputs.source_text_models import (
 from ai_interviewer.candidate_inputs.source_texts import (
     CandidateSourceTextConflictError,
     CandidateSourceTextNotFoundError,
+    CandidateSourceTextPreconditionError,
     CandidateSourceTextService,
     ParserExecutionIdentity,
 )
@@ -70,10 +71,15 @@ async def _attached_document_version(
 async def test_parser_result_is_encrypted_immutable_idempotent_and_owner_scoped(
     database: Database,
 ) -> None:
-    account_id, _, _, files, asset, attached, parser = await _attached_document_version(
-        database,
-        "encrypted-lineage",
-    )
+    (
+        account_id,
+        preparation_id,
+        _,
+        files,
+        asset,
+        attached,
+        parser,
+    ) = await _attached_document_version(database, "encrypted-lineage")
     document_version_id = attached.attached_version.version_id
     source_texts = CandidateSourceTextService(database, _application_keyring())
     content = "Senior Python mühəndisi\nPostgreSQL və təhlükəsizlik təcrübəsi"
@@ -92,7 +98,7 @@ async def test_parser_result_is_encrypted_immutable_idempotent_and_owner_scoped(
         parser,
         "source-text-store-retry",
     )
-    fetched = await source_texts.get_source_text(account_id, document_version_id)
+    fetched = await source_texts.get_source_text(account_id, preparation_id, document_version_id)
 
     assert first.created is True
     assert repeated.created is False
@@ -109,7 +115,7 @@ async def test_parser_result_is_encrypted_immutable_idempotent_and_owner_scoped(
     assert text_version.parser_release_policy_id == parser.parser_release_policy_id
 
     with pytest.raises(CandidateSourceTextNotFoundError):
-        await source_texts.get_source_text(uuid4(), document_version_id)
+        await source_texts.get_source_text(uuid4(), preparation_id, document_version_id)
     with pytest.raises(CandidateSourceTextConflictError, match="different parser result"):
         await source_texts.store_parser_extraction(
             account_id,
@@ -227,4 +233,124 @@ async def test_parser_provenance_and_latest_document_version_fail_closed(
         files,
         {first_asset.id, second_asset.id},
         worker_id="candidate-source-text-policy-cleanup",
+    )
+
+
+@pytest.mark.asyncio
+async def test_correction_append_is_optimistic_idempotent_and_owner_scoped(
+    database: Database,
+) -> None:
+    (
+        account_id,
+        preparation_id,
+        _,
+        files,
+        asset,
+        attached,
+        parser,
+    ) = await _attached_document_version(database, "correction-lineage")
+    document_version_id = attached.attached_version.version_id
+    source_texts = CandidateSourceTextService(database, _application_keyring())
+    original = "Parsed CV text before any owner correction."
+    stored = await source_texts.store_parser_extraction(
+        account_id,
+        document_version_id,
+        original,
+        parser,
+        "source-text-for-correction",
+    )
+    assert stored.source_text.aggregate_version == 1
+
+    corrected = "Parsed CV text after the owner fixed a typo."
+    first_correction = await source_texts.append_correction(
+        account_id,
+        preparation_id,
+        document_version_id,
+        corrected,
+        1,
+        "correction-first",
+    )
+    assert first_correction.aggregate_version == 2
+    assert first_correction.latest_version_number == 2
+    latest = first_correction.versions[-1]
+    assert latest.origin == "user_correction"
+    assert latest.version_number == 2
+    assert latest.previous_version_id == first_correction.versions[0].text_version_id
+    assert latest.content == corrected
+    assert latest.parser_adapter is None
+    assert latest.parser_release_policy_id is None
+
+    repeated_correction = await source_texts.append_correction(
+        account_id,
+        preparation_id,
+        document_version_id,
+        corrected,
+        1,
+        "correction-retry",
+    )
+    assert repeated_correction == first_correction
+
+    with pytest.raises(CandidateSourceTextPreconditionError):
+        await source_texts.append_correction(
+            account_id,
+            preparation_id,
+            document_version_id,
+            "a completely different correction",
+            1,
+            "correction-stale",
+        )
+    with pytest.raises(CandidateSourceTextPreconditionError):
+        await source_texts.append_correction(
+            account_id,
+            preparation_id,
+            document_version_id,
+            corrected,
+            99,
+            "correction-future-version",
+        )
+    with pytest.raises(CandidateSourceTextNotFoundError):
+        await source_texts.append_correction(
+            account_id,
+            uuid4(),
+            document_version_id,
+            corrected,
+            2,
+            "correction-wrong-preparation",
+        )
+    with pytest.raises(CandidateSourceTextNotFoundError):
+        await source_texts.append_correction(
+            uuid4(),
+            preparation_id,
+            document_version_id,
+            corrected,
+            2,
+            "correction-wrong-owner",
+        )
+
+    second_correction = await source_texts.append_correction(
+        account_id,
+        preparation_id,
+        document_version_id,
+        "Parsed CV text after a second owner correction.",
+        2,
+        "correction-second",
+    )
+    assert second_correction.aggregate_version == 3
+    assert second_correction.versions[-1].previous_version_id == latest.text_version_id
+
+    async with database.transaction() as session:
+        audit = await session.scalar(
+            select(AuditEvent).where(
+                AuditEvent.action == "candidate_source_text.correction_appended",
+                AuditEvent.owner_id == account_id,
+            )
+        )
+    assert audit is not None
+    assert "Parsed CV text" not in f"{audit.details}"
+
+    await _delete_test_assets(
+        database,
+        files,
+        {asset.id},
+        worker_id="candidate-source-text-correction-cleanup",
     )
