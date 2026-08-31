@@ -101,6 +101,21 @@ async def test_parser_identity_validation_fails_before_database_access() -> None
 
 
 @pytest.mark.asyncio
+async def test_correction_content_validation_fails_before_database_access() -> None:
+    with pytest.raises(ValueError, match="empty"):
+        await _service().append_correction(uuid4(), uuid4(), uuid4(), "   ", 1, None)
+    with pytest.raises(ValueError, match="LF newlines"):
+        await _service().append_correction(
+            uuid4(),
+            uuid4(),
+            uuid4(),
+            "one\r\ntwo",
+            1,
+            None,
+        )
+
+
+@pytest.mark.asyncio
 async def test_source_text_builder_and_disabled_runtime_fail_closed() -> None:
     disabled = build_candidate_source_texts(
         Settings(_env_file=None, environment="test"),
@@ -117,7 +132,9 @@ async def test_source_text_builder_and_disabled_runtime_fail_closed() -> None:
             None,
         )
     with pytest.raises(CandidateSourceTextUnavailableError):
-        await disabled.get_source_text(uuid4(), uuid4())
+        await disabled.get_source_text(uuid4(), uuid4(), uuid4())
+    with pytest.raises(CandidateSourceTextUnavailableError):
+        await disabled.append_correction(uuid4(), uuid4(), uuid4(), "valid text", 1, None)
 
     enabled_settings = Settings(_env_file=None, environment="test").model_copy(
         update={

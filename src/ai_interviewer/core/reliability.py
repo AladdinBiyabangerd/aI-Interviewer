@@ -33,6 +33,7 @@ PRODUCT_HTTP_ROUTES = frozenset(
         "/api/v1/preparations/{preparation_id}/documents/{document_type}/upload",
         "/api/v1/preparations/{preparation_id}/documents/{document_type}/paste",
         "/api/v1/preparations/{preparation_id}/document-intakes/{intake_id}",
+        "/api/v1/preparations/{preparation_id}/document-versions/{document_version_id}/source-text",
         "/api/v1/privacy/consents",
         "/api/v1/privacy/consents/{consent_notice_id}",
         "/api/v1/privacy/consents/{consent_record_id}",

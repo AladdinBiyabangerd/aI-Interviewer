@@ -46,29 +46,31 @@ Hazırda aşağıdakı hissələr tamamlanıb:
 | 1A-D1 | Tamamlanıb | AES-256-GCM encrypted immutable source-text lineage və exact parser provenance boundary |
 | 1A-D2.1 | Tamamlanıb | Durable extraction-job scheduling, lease fencing, bounded retry və safe failure taxonomy |
 | 1A-D2.2 | Tamamlanıb | No-network, resource-bounded isolated PDF/DOCX/TXT parser worker |
+| 1A-D3 | Tamamlanıb | Owner-scoped source-text read/correction HTTP contract, optimistic idempotent append |
 | 0D-C-B2 | Pre-production-a təxirə salınıb | Real backend seçimi, 28 günlük canlı toplama və adlı təsdiqlər |
 | 0D-C-C və sonrası | Pre-production-a təxirə salınıb | Alertlər, incident məşqləri, traffic protection və production gate |
 
-Son tam local verification snapshot-ı (D2.2, 2026-08-30):
+Son tam local verification snapshot-ı (D3, 2026-08-30):
 
-- Python 3.12 altında `not integration` filtri ilə `324` test keçib, `1`-i (POSIX-only
-  signal-kill ssenarisi) Windows-da skip olunub.
-- Strict mypy indi `platform = "linux"` hədəfi ilə `69` source faylı üçün keçir; bu,
-  production/CI hədəfi olan Linux üçün POSIX-only `resource`/`os.getuid` davranışını
-  doğru yoxlayır.
+- Python 3.12 altında `not integration` filtri ilə `331` test keçib, `1`-i (POSIX-only
+  signal-kill ssenarisi) Windows-da skip olunub; `0` uğursuz test.
+- Strict mypy `platform = "linux"` hədəfi ilə `70` source faylı üçün keçir.
 - Ruff lint və format yoxlamaları keçib.
-- `not integration` filtri altında ümumi coverage `72.31%`-dir; bu, layihənin əvvəldən
+- `not integration` filtri altında ümumi coverage `71.53%`-dir; bu, layihənin əvvəldən
   sabit qaydasına uyğundur — `95%` minimum yalnız real PostgreSQL-ə qarşı tam suite
   işlədikdə ölçülür. Docker Desktop bu handoff zamanı əlçatan olmadığı üçün real
-  PostgreSQL integration suite-i (2 yeni D2.2 testi daxil olmaqla) yenə işlədilməyib;
-  D2.1-in özü də eyni məhdudiyyəti qeyd etmişdi.
-- Yeni `pypdf` və `python-docx` runtime asılılıqları əlavə edildi; hər ikisi `uv add`
-  ilə lock-landı.
-- Alembic schema revision dəyişməyib (`20260828_0009`); D2.2 heç bir yeni cədvəl və ya
-  sütun əlavə etmir.
+  PostgreSQL integration suite-i (D2.2-in 2 testi üstünə D3-ün yeni correction
+  testləri daxil olmaqla) yenə işlədilməyib; D2.1 və D2.2 eyni məhdudiyyəti qeyd
+  etmişdi.
+- Yeni `pypdf` və `python-docx` runtime asılılıqları D2.2-də əlavə edildi; D3 heç bir
+  yeni asılılıq gətirmir.
+- Alembic schema revision dəyişməyib (`20260828_0009`); D2.2 və D3 heç bir yeni cədvəl
+  və ya sütun əlavə etmir.
+- D3 zamanı `core/reliability.py`-də yeni source-text route-u reviewed SLI product-route
+  populyasiyasına əlavə edildi; mövcud route-drift regression testi bunu artıq qoruyur.
 
 Repository GitHub-a `b2d4ed3` (`Complete Phase 1A-C authenticated document intake`)
-commit-i ilə push edilib. Phase 1A-D1, 1A-D2.1 və 1A-D2.2 dəyişiklikləri həmin
+commit-i ilə push edilib. Phase 1A-D1, 1A-D2.1, 1A-D2.2 və 1A-D3 dəyişiklikləri həmin
 commit-dən sonrakı lokal, ayrıca review/commit vahidləridir və istifadəçinin
 göstərişinə uyğun GitHub-a push edilməyib. Lokal rehearsal hələ production release
 deyil; imzalanmış promotion, retained CI evidence və approval gate-i production-dan
@@ -1353,6 +1355,87 @@ text hazır olmadan heç bir AI processing başlaya bilməz.
 Ətraflı qərar və sübut: [ADR 0015](adr/0015-isolated-parser-worker.md) və
 [Phase 1A-D2.2 completion record](status/phase-1a-d2-2-isolated-parser-worker.md).
 
+## 5.16 Phase 1A-D3 — Owner source-text inspection və correction
+
+### Məqsəd və sərhəd
+
+D1-in yaratdığı encrypted source-text lineage-ni və D2.2-nin yaratdığı real parser
+nəticəsini owner-ə göstərmək və düzəliş imkanı vermək. Heç bir yeni cədvəl və ya sütun
+əlavə olunmayıb — D1 artıq `user_correction` revision şəklini dəstəkləyirdi.
+
+### Service dəyişiklikləri
+
+- `get_source_text` indi `account_id -> preparation_id -> document_version_id`
+  ownership zəncirini tam yoxlayır (əvvəllər yalnız `account_id -> document_version_id`
+  idi) — preparations/documents/document-intakes-də artıq mövcud olan konvensiyaya
+  uyğunlaşdırılıb. `store_parser_extraction` (yalnız worker üçündür, heç vaxt HTTP-ə
+  açılmır) qəsdən dəyişməz saxlanılıb.
+- Yeni `append_correction` metodu eyni ownership zəncirini və document/preparation
+  eligibility qaydasını (draft, expired olmayan, uyğun privacy snapshot, yalnız son
+  document version) yoxlayır, canlı privacy qərarını yenidən təsdiqləyir və yeni
+  `CandidateSourceTextVersion` (`origin="user_correction"`, bütün `parser_*` sahələri
+  `NULL`, `previous_version_id` əvvəlki son versiyaya bağlı) əlavə edir.
+- Optimistic concurrency mövcud aggregate `version` sütunundan (artıq başqa
+  resurslarda ETag mənbəyi kimi istifadə olunur) istifadə edir: stale `If-Match` `412`
+  qaytarır. Eyni `If-Match` və content ilə təkrar sorğu — artıq tətbiq olunmuş
+  correction-u aşkarlayıb (decrypt edib müqayisə edərək) heç bir duplicate yaratmadan
+  cari state-i qaytarır.
+- Yeni `CandidateSourceTextPreconditionError` (`412`) `CandidateSourceTextConflictError`
+  (`409`)-dan ayrıdır — biri stale ETag, digəri document/policy state konflikti üçündür.
+
+### HTTP contract
+
+```text
+GET/PUT /api/v1/preparations/{preparation_id}/document-versions/{document_version_id}/source-text
+```
+
+- Scope: GET → `preparation:read`, PUT → `preparation:write`.
+- Route `document-intakes/{intake_id}` konvensiyasına uyğun olaraq preparation altında
+  flat saxlanılır (documents resource-u vasitəsilə nest olunmur).
+- GET tam decrypted version lineage-i (content daxil) bir cavabda qaytarır — ayrıca
+  raw-download content-type-ə ehtiyac yoxdur.
+- PUT strong quoted `If-Match` tələb edir (`428` yoxdursa, `400` səhvdirsə, `412`
+  stale-dirsə) və `{"content": str}` body-ni 500,000 simvola qədər qəbul edir.
+- Yeni route `core/reliability.py`-dəki reviewed SLI product-route populyasiyasına
+  əlavə olundu; mövcud route-drift regression testi bunu qoruyur.
+
+### Deliberately not implemented
+
+- Ayrıca `text/plain` raw-download endpoint-i yoxdur; JSON cavabı artıq tam content
+  daşıyır.
+- Correction history diff/rollback UI müqaviləsi yoxdur — GET artıq immutable version
+  siyahısını qaytarır, bundan artıq UI-specific funksionallıq bu fazanın işi deyil.
+- Bu yeni yazma yolu üçün ayrıca export/deletion/audit review keçirilmədi; D1-in
+  cascade erasure və privacy-audit inteqrasiyası strukturca artıq buranı əhatə edir,
+  amma tam Phase 1A lifecycle sign-off D4-ün işidir.
+- Heç bir AI processing bu mətni hələ oxumur.
+
+### Verification
+
+- `not integration` filtri ilə `331` test keçib, `1`-i (POSIX-only) Windows-da skip
+  olunub, `0` uğursuz.
+- Strict mypy `platform = "linux"` hədəfi ilə `70` source faylı üçün keçir.
+- Ruff lint və format yoxlamaları keçib.
+- Yeni integration testlər (`tests/integration/test_candidate_source_texts.py`):
+  end-to-end correction append, idempotent retry, stale-version və future-version
+  precondition, wrong-preparation/wrong-owner rejection, ardıcıl ikinci correction-un
+  `previous_version_id` zəncirini düzgün saxlaması. Docker Desktop əlçatan olmadığı
+  üçün bunlar hazırda lokal skip olunur.
+- Yeni HTTP-səviyyəli testlər (`tests/test_source_texts_api.py`): scope enforcement,
+  ETag round-trip, `428`/`400`/`412` If-Match handling, `404`/`503`/`409` error
+  mapping (daxili exception mətni sızmadan) və boş correction content üçün `422`.
+- Heç bir yeni Alembic migration tələb olunmadı.
+
+### Next part
+
+Phase 1A-D4 (lifecycle və phase gate) Phase 1A-nı bağlayır: D1-D3-də yaranan
+source-text/correction data üçün privacy access/export inteqrasiya review-u, Docker
+əlçatan olduqda concurrency/security/migration/restore verification, və Phase 1B
+(CV/JD profiling) başlamazdan əvvəl tam 1A flow üzrə supported-input fixture pass-ı.
+
+Ətraflı qərar və sübut: [ADR 0016](adr/0016-owner-source-text-inspection-and-correction.md)
+və [Phase 1A-D3 completion record](status/phase-1a-d3-owner-inspection-and-correction.md).
+
 Stop here until the next explicit continuation request.
 
 ## 6. Hazırda mövcud HTTP API contract-ı
@@ -1378,6 +1461,8 @@ Stop here until the next explicit continuation request.
 | `POST /api/v1/preparations/{preparation_id}/documents/{document_type}/upload` | Raw PDF/DOCX/text-i validate, scan və attach etmək | `preparation:write` + `Idempotency-Key` |
 | `POST /api/v1/preparations/{preparation_id}/documents/{document_type}/paste` | UTF-8 text-i validate, scan və attach etmək | `preparation:write` + `Idempotency-Key` |
 | `GET /api/v1/preparations/{preparation_id}/document-intakes/{intake_id}` | Owned durable intake status-u | `preparation:read` |
+| `GET /api/v1/preparations/{preparation_id}/document-versions/{document_version_id}/source-text` | Decrypted source-text lineage və aggregate ETag | `preparation:read` |
+| `PUT /api/v1/preparations/{preparation_id}/document-versions/{document_version_id}/source-text` | Owner correction append | `preparation:write` + strong `If-Match` |
 
 `POST /privacy/requests` scope mapping-i:
 
@@ -1387,7 +1472,7 @@ Stop here until the next explicit continuation request.
 
 API hələ aşağıdakı endpoint-ləri vermir:
 
-- parser və extracted text;
+- extraction job-un manual trigger/cancel route-u;
 - interview blueprint/session/answer;
 - model invocation;
 - scoring/evaluation/report;

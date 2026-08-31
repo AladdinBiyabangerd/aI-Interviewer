@@ -210,7 +210,21 @@ class FakeSourceTextRuntime(CandidateSourceTextRuntime):
     async def get_source_text(
         self,
         account_id: UUID,
+        preparation_id: UUID,
         document_version_id: UUID,
+    ) -> CandidateSourceTextRecord:
+        raise NotImplementedError
+
+    async def append_correction(
+        self,
+        account_id: UUID,
+        preparation_id: UUID,
+        document_version_id: UUID,
+        content: str,
+        expected_version: int,
+        request_id: str | None,
+        *,
+        now: datetime | None = None,
     ) -> CandidateSourceTextRecord:
         raise NotImplementedError
 

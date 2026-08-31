@@ -129,7 +129,7 @@ async def test_extraction_worker_succeeds_end_to_end_for_text_document(
     assert outcomes[0].status == "succeeded"
     assert outcomes[0].error_code is None
 
-    stored = await source_texts.get_source_text(account_id, document_version_id)
+    stored = await source_texts.get_source_text(account_id, preparation_id, document_version_id)
     assert stored.versions[-1].content == content.decode()
     assert stored.versions[-1].origin == "parser_extraction"
     assert stored.versions[-1].parser_adapter == "isolated-text-parser"
