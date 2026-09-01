@@ -162,6 +162,7 @@ def test_secret_file_rejects_relative_production_paths_and_non_files(tmp_path: P
 
     repeated_newline = tmp_path / "repeated-newline"
     repeated_newline.write_text("secret\n\n", encoding="utf-8")
+    repeated_newline.chmod(0o600)
     with pytest.raises(SecretFileError, match="malformed"):
         read_secret_file(repeated_newline, hosted=False)
 
@@ -172,6 +173,7 @@ def test_secret_file_handles_crlf_and_opaque_read_failures(
 ) -> None:
     secret_file = tmp_path / "secret"
     secret_file.write_bytes(b"secret\r\n")
+    secret_file.chmod(0o600)
     assert read_secret_file(secret_file, hosted=False) == "secret"
 
     monkeypatch.setattr(secret_delivery.os, "read", lambda *_: (_ for _ in ()).throw(OSError()))
