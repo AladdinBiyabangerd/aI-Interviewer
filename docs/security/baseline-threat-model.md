@@ -430,7 +430,8 @@ Candidate-preparation web application, API, workers, PostgreSQL, object storage,
 - Privacy export advances to `phase-1b-c2` and includes the complete decrypted,
   revalidated profile history. Existing account/document/source cascades erase it. The
   existing schema already reserved and protects correction rows, so no migration was
-  needed. No provider activation or continuous worker supervisor is added.
+  needed. C2 added no provider activation or worker supervisor; the later
+  disabled-by-default supervisor is covered below and by ADR 0028.
 
 ## Phase 1B-D1 controls implemented
 
@@ -486,6 +487,10 @@ Candidate-preparation web application, API, workers, PostgreSQL, object storage,
 - A second `--confirm-external-processing` operator action is mandatory. This is a
   deliberate safety interlock, not a substitute for rights, privacy, transfer, region,
   retention, deletion, budget, or provider-contract approval.
+- A provider-free preflight runs the same corpus digest, current prompt, exact release,
+  and active-window authorization checks without constructing a gateway or reading a
+  credential. Its summary excludes corpus content, paths, approver identity, processor
+  and data-control references, and every secret.
 - The corpus is bounded to 200 fixtures and runs sequentially. Deterministic request IDs
   contain digests/coordinates rather than candidate text. Strict gateway and exact-source
   validation remain active; expected failures become bounded codes.
@@ -498,5 +503,23 @@ Candidate-preparation web application, API, workers, PostgreSQL, object storage,
   reviewers required by D1.
 - Tests use an in-memory provider. D2.2a made no external call and includes no credential,
   real corpus, prediction evidence, processor approval, or human quality decision.
+
+## Disabled-by-default worker supervision controls implemented
+
+- Background work is never started by the API lifespan. A separate operator/orchestrator
+  command is required in addition to each worker's explicit enablement flag.
+- Extraction remains unavailable without the secure file boundary. Profiling retains
+  its model, privacy, secure-file, immutable processor-activity, prompt, evidence, and
+  live-lease checks; the supervisor cannot bypass them.
+- Each sweep is bounded and attempts enabled worker types independently. Runtime failure
+  in one queue produces backoff without starving the other queue. Cancellation and
+  process termination preserve normal application resource cleanup.
+- Lost extraction transitions are fenced rather than retried against an expired lease.
+  The durable winner remains authoritative.
+- Operational output contains only bounded outcome counts and exception class names.
+  Candidate content, identifiers, paths, keys, object coordinates, provider bodies, and
+  exception messages remain excluded.
+- Both workers remain disabled by default. No process deployment, provider activation,
+  credential, corpus, quality approval, or new data category is introduced.
 
 This threat model must be updated before each phase gate and whenever a new data type, vendor, trust boundary, or external audience is introduced.

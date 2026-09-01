@@ -31,10 +31,17 @@ Outputs are canonical JSON written with create-only semantics and a private file
 stdout and errors contain only types, counts, status, and digests. The command does not
 resume a partial run or overwrite an artifact.
 
+A provider-free `preflight` command exposes the same corpus digest, current prompt,
+dataset/version, and active-window validation before an operator configures a credential
+or confirms external processing. It returns only exact model coordinates, counts,
+timestamps, and canonical digests; paths, approver identity, data-control references,
+source text, gold profiles, and credentials remain excluded.
+
 ## Consequences
 
 - Corpus or prompt changes require a new authorization.
 - Model aliases/drift and inactive approvals fail before data transfer.
+- Operators can prove authorization readiness without constructing a provider gateway.
 - A completed prediction file may include safe failures and grants no release approval.
 - Humans must exhaustively adjudicate claims and record owner review before the D1
   evaluator accepts the final evidence shape.

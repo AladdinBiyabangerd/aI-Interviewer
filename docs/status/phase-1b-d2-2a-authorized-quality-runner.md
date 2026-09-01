@@ -15,6 +15,8 @@ real corpus, human adjudication, quality pass, or release approval was produced.
   language/document/risk shape, gold profile, and exact source evidence;
 - active authorization bound to the complete corpus SHA-256, exact OpenAI release,
   prompt digest, processor activity, data controls, approver, and validity window;
+- provider-free offline preflight of the exact corpus, prompt, digest, release, and
+  active-window binding with payload-safe output;
 - mandatory `--confirm-external-processing` before configuration or corpus processing;
 - deterministic request UUIDs, sequential bounded execution, strict response contracts,
   repeated exact evidence validation, and safe per-fixture failure records;
@@ -43,3 +45,22 @@ real corpus, human adjudication, quality pass, or release approval was produced.
 - repository scan: no OpenAI project-key token and no local `.env` file present.
 
 The next gate is Phase 1B-D2.2b, the approved real-corpus run and human quality decision.
+
+## Follow-up offline preflight hardening
+
+The runner now exposes `preflight <corpus> <authorization>` so an operator can validate
+the exact corpus digest, current prompt contract, dataset/version, active approval window,
+and authorized OpenAI release before configuring a credential or confirming external
+processing. It constructs no provider gateway and makes no network request. Its summary
+contains only safe coordinates, timestamps, counts, and digests; it excludes paths,
+approver identity, processor/data-control references, source text, gold profiles, and
+secrets.
+
+Current full verification after this hardening:
+
+- `./scripts/verify.ps1`: 632 passed, 1 skipped;
+- combined branch coverage: 95.64%;
+- Ruff check/format: 226 files;
+- strict mypy: 89 source files;
+- all 12 PostgreSQL migrations applied from zero with model/migration parity checks;
+- dependency compatibility and vulnerability audit: no known vulnerability.

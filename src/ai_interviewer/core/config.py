@@ -139,6 +139,11 @@ class Settings(BaseSettings):
     )
     profiling_worker_enabled: bool = False
     profiling_worker_id: str = "candidate-profiling-worker"
+    extraction_worker_enabled: bool = False
+    extraction_worker_id: str = "candidate-extraction-worker"
+    worker_batch_size: int = Field(default=10, ge=1, le=100)
+    worker_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
+    worker_error_backoff_seconds: float = Field(default=5.0, ge=1, le=300)
 
     @model_validator(mode="before")
     @classmethod
@@ -383,7 +388,7 @@ class Settings(BaseSettings):
             raise ValueError("OpenAI API key must be a bounded non-placeholder secret")
         return value
 
-    @field_validator("profiling_worker_id")
+    @field_validator("profiling_worker_id", "extraction_worker_id")
     @classmethod
     def validate_profiling_worker_id(cls, value: str) -> str:
         normalized = value.strip()
@@ -531,6 +536,8 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "profiling worker model retry budget must fit within the fenced lease"
                 )
+        if self.extraction_worker_enabled and not self.file_security_enabled:
+            raise ValueError("extraction worker requires file security")
         if self.telemetry_enabled and self.telemetry_otlp_endpoint is None:
             raise ValueError("enabled telemetry requires an OTLP endpoint")
         if not self.telemetry_enabled and self.telemetry_otlp_endpoint is not None:

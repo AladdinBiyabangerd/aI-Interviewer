@@ -167,6 +167,26 @@ class DisabledFileSecurity:
         del account_id, file_asset_id, now
         raise FileSecurityUnavailableError("file security is disabled")
 
+    async def read_for_parser(
+        self,
+        *,
+        account_id: UUID,
+        file_asset_id: UUID,
+        parser_adapter: str,
+        parser_version: str,
+        isolation_profile: str,
+        now: datetime | None = None,
+    ) -> bytes:
+        del (
+            account_id,
+            file_asset_id,
+            parser_adapter,
+            parser_version,
+            isolation_profile,
+            now,
+        )
+        raise FileSecurityUnavailableError("file security is disabled")
+
     async def schedule_account_deletion(
         self,
         session: AsyncSession,

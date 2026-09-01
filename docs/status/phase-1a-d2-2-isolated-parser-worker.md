@@ -44,9 +44,9 @@ version or a closed D2.1 failure code.
 
 ## Deliberately not implemented
 
-- No continuous supervisor process or CLI entrypoint drives the worker yet; it is an
-  importable, directly testable unit, matching the existing `claim_deletion_tasks`
-  precedent that also has no dedicated runner loop yet.
+- At this phase, no continuous supervisor process or CLI entrypoint drove the worker;
+  it was an importable, directly testable unit. The later disabled-by-default runtime is
+  governed by [ADR 0028](../adr/0028-disabled-by-default-worker-supervision.md).
 - No product route, owner inspection/correction, or export/deletion integration for
   worker-produced source text exists yet — that is Phase 1A-D3/D4.
 - No true kernel-level sandboxing (seccomp, network namespaces, cgroups) is implemented;

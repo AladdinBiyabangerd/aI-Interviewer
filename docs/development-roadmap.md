@@ -109,7 +109,7 @@ Delivery inside 1A is gated further:
 4. **1A-D - sandboxed extraction and user correction - in progress:** exact approved parser worker, source-text versions, bounded extraction errors, and user inspection/correction before AI processing.
    - **1A-D1 - encrypted immutable source-text domain - implemented:** one owner-bound aggregate per exact document version; AES-256-GCM content with metadata-bound AAD; keyed rotation-aware integrity digest; immutable parser/correction revision shape; exact active document/asset/privacy/parser-policy checks; idempotent parser-result persistence; cascade erasure; content-free audit/outbox. No parser or public endpoint exists yet.
    - **1A-D2.1 - durable extraction job contract - implemented:** one idempotent owner-bound job per exact document version; immutable parser/privacy/retention snapshots; UUID lease fencing; `SKIP LOCKED` claims; bounded attempts and safe failure codes; exponential retry; content-free audit/outbox transitions; no parser execution yet.
-   - **1A-D2.2 - isolated parser execution - implemented:** exact released-policy-only reads through `read_for_parser`; no-network/resource-bounded child-process isolation (POSIX resource limits; the production target is Linux); separately versioned PDF/DOCX/TXT adapters; bounded safe failure taxonomy; crash-safe delivery into D1 through the new `CandidateExtractionWorker`. No continuous supervisor process/CLI or product route exists yet.
+   - **1A-D2.2 - isolated parser execution - implemented:** exact released-policy-only reads through `read_for_parser`; no-network/resource-bounded child-process isolation (POSIX resource limits; the production target is Linux); separately versioned PDF/DOCX/TXT adapters; bounded safe failure taxonomy; crash-safe delivery into D1 through the new `CandidateExtractionWorker`. A later disabled-by-default shared supervisor now supplies one-shot and continuous execution; no product route or default activation exists.
    - **1A-D3 - owner inspection and correction - implemented:** authenticated owner-scoped reads validating the full preparation/document-version chain; safe combined display contract returning full decrypted version lineage; optimistic (`If-Match`) and idempotent immutable correction append; the route is registered in the reviewed SLI product-route population. No AI processing reads this text yet.
    - **1A-D4 - lifecycle and phase gate - implemented and locally release-verified:** privacy access/export integration for source-text (real decrypted content) and extraction-job (operational metadata) data is provided through two narrow lifecycle adapters; erasure remains covered by the existing `ON DELETE CASCADE` chains; parametrized supported-input fixtures pass through the real isolated worker for parseable PDF, DOCX, and text documents. The PostgreSQL integration suite, migration round-trip/model parity, logical backup/restore rehearsal, and release-image artifact check all passed at `20260828_0009`.
 
@@ -154,8 +154,9 @@ Delivery inside 1B is gated further:
      encrypted deletion-locator registration; strict gateway execution; repeated exact
      evidence verification; encrypted idempotent profile persistence; live lease-token
      completion; payload-blind failures and cancellation. Runtime is separately disabled
-     by default; D2.1 now supplies the OpenAI adapter, while no credential or supervisor
-     is shipped.
+      by default; D2.1 now supplies the OpenAI adapter, while no credential is shipped.
+      A later shared worker process can supervise this runtime only after its separate
+      enablement and deployment gates are satisfied.
    - **1B-C2 - owner profile inspection and immutable correction - implemented and
      locally release-verified:** authenticated owner-scoped safe job status and completed
      profile-history reads; strong ETag/`If-Match`; optimistic and exact-retry-idempotent
@@ -180,10 +181,11 @@ Delivery inside 1B is gated further:
        failures; UUID request correlation; server-only secret/file delivery; disabled by
        default; mock-transport tests only, with no credential or external call.
      - **1B-D2.2a - authorized offline quality runner - implemented and locally verified:**
-      separate strict corpus, time-bounded authorization, prediction, and unadjudicated
-      review-draft artifacts; exact corpus/prompt/OpenAI-release binding; explicit external
-      processing confirmation; deterministic request IDs; sequential bounded calls;
-      create-only private output and payload-free summaries. No live call was made.
+       separate strict corpus, time-bounded authorization, prediction, and unadjudicated
+       review-draft artifacts; exact corpus/prompt/OpenAI-release binding; provider-free
+       authorization preflight; explicit external processing confirmation; deterministic
+       request IDs; sequential bounded calls; create-only private output and payload-free
+       summaries. No live call was made.
      - **1B-D2.2b1 - exact review finalization - implemented and locally verified:**
        local-only finalization binds a human-completed review back to the exact corpus and
        prediction run; rejects source, provenance, gold, prediction, coordinate, and order
@@ -193,7 +195,8 @@ Delivery inside 1B is gated further:
       every minimum; outputs from one approved exact OpenAI release; exhaustive human
       adjudication and owner-review outcomes; recorded slice/error analysis; all
       thresholds met; four named approvals bound to the exact evidence digest. Product
-      activation and continuous supervision remain separate reviewed decisions.
+       activation and production deployment of the disabled-by-default supervisor remain
+       separate reviewed decisions.
 
 #### 1C. Baseline interview blueprint
 
@@ -367,4 +370,4 @@ Numeric thresholds are established with real baseline data before each relevant 
 
 ## 6. Current stop point
 
-Phases 0A, 0B, 0C-A, 0C-B, 0C-C, 0D-A, 0D-B, 0D-C-A, 0D-C-B1, and 1A-A through 1A-D4 are complete and locally release-verified, closing Phase 1A. Phase 1B is now in progress: 1B-A provides the provider-neutral model gateway, 1B-B1 provides strict exact-evidence CV/JD output contracts, 1B-B2 provides encrypted immutable profile persistence and durable fenced jobs, 1B-C1 provides policy-gated worker execution with immutable processor authorization, encrypted usage registration, exact prompts, repeated evidence validation, and lease-fenced completion, 1B-C2 provides authenticated owner status/inspection plus immutable evidence-revalidated correction, and 1B-D1 provides the deterministic offline quality contract. Phase 1B-D2.1 provides a concrete disabled-by-default OpenAI Responses adapter, D2.2a provides an exact-authorization private offline runner and unadjudicated review draft, and D2.2b1 provides exact, drift-resistant human-review finalization. No credential or real corpus was stored and no external call was made. The next gate is D2.2b2: run a rights-cleared full corpus, complete human adjudication and error analysis, pass every threshold, and obtain four named approvals. Under ADR 0010, live staging measurement and the remaining 0D production gates are deferred until the Phase 1 text contract is feature-stable, but remain mandatory before any production release. Country enablement and every real model processor still require approved legal policy records and activity-specific authorization; product activation and continuous supervision remain separate reviewed decisions.
+Phases 0A, 0B, 0C-A, 0C-B, 0C-C, 0D-A, 0D-B, 0D-C-A, 0D-C-B1, and 1A-A through 1A-D4 are complete and locally release-verified, closing Phase 1A. Phase 1B is now in progress: 1B-A provides the provider-neutral model gateway, 1B-B1 provides strict exact-evidence CV/JD output contracts, 1B-B2 provides encrypted immutable profile persistence and durable fenced jobs, 1B-C1 provides policy-gated worker execution with immutable processor authorization, encrypted usage registration, exact prompts, repeated evidence validation, and lease-fenced completion, 1B-C2 provides authenticated owner status/inspection plus immutable evidence-revalidated correction, and 1B-D1 provides the deterministic offline quality contract. Phase 1B-D2.1 provides a concrete disabled-by-default OpenAI Responses adapter, D2.2a provides an exact-authorization private offline runner and unadjudicated review draft, and D2.2b1 provides exact, drift-resistant human-review finalization. A separate payload-blind worker process now provides bounded one-shot or continuous supervision for explicitly enabled extraction/profiling workers; both remain disabled by default and production activation is not approved. No credential or real corpus was stored and no external call was made. The next gate is D2.2b2: run a rights-cleared full corpus, complete human adjudication and error analysis, pass every threshold, and obtain four named approvals. Under ADR 0010, live staging measurement and the remaining 0D production gates are deferred until the Phase 1 text contract is feature-stable, but remain mandatory before any production release. Country enablement and every real model processor still require approved legal policy records and activity-specific authorization; product and worker activation remain separate reviewed decisions.

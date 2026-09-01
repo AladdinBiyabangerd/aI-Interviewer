@@ -36,8 +36,10 @@ from ai_interviewer.profiling.quality_run import (
     generate_profile_quality_predictions,
     load_profile_quality_corpus,
     load_profile_quality_review_draft,
+    preflight_profile_quality_run,
     prepare_profile_quality_review_draft,
     profile_quality_corpus_sha256,
+    profile_quality_run_authorization_sha256,
     write_private_quality_artifact,
 )
 
@@ -182,6 +184,22 @@ async def test_authorized_prediction_run_is_reproducible_and_payload_safe() -> N
     assert first_provider.requests[0].request_id == first.fixtures[0].request_id
     assert _SOURCE not in repr(corpus)
     assert _SOURCE not in repr(first)
+
+
+def test_quality_run_preflight_is_provider_free_and_payload_safe() -> None:
+    corpus = _corpus()
+    authorization = _authorization(corpus)
+
+    result = preflight_profile_quality_run(corpus, authorization, now=_NOW)
+
+    assert result.status == "authorized"
+    assert result.corpus_sha256 == profile_quality_corpus_sha256(corpus)
+    assert result.authorization_sha256 == profile_quality_run_authorization_sha256(authorization)
+    assert result.prompt_contract_sha256 == profile_quality_prompt_contract_sha256()
+    assert result.model_release == authorization.model_release
+    assert result.fixture_count == 1
+    assert _SOURCE not in repr(result)
+    assert authorization.approver_id not in result.model_dump_json()
 
 
 @pytest.mark.asyncio
@@ -606,6 +624,62 @@ def test_generate_cli_requires_explicit_external_processing_confirmation(
     assert captured.out == ""
     assert provider.requests == []
     assert not output_path.exists()
+
+
+def test_preflight_cli_needs_no_gateway_and_prints_only_safe_coordinates(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    corpus = _corpus()
+    authorization = _authorization(corpus)
+    corpus_path = tmp_path / "private-corpus.json"
+    authorization_path = tmp_path / "private-authorization.json"
+    write_private_quality_artifact(corpus_path, corpus)
+    write_private_quality_artifact(authorization_path, authorization)
+
+    status = main(
+        ("preflight", str(corpus_path), str(authorization_path)),
+        gateway=DisabledModelGateway(),
+        now=_NOW,
+    )
+
+    captured = capsys.readouterr()
+    summary = json.loads(captured.out)
+    assert status == 0
+    assert captured.err == ""
+    assert summary["status"] == "authorized"
+    assert summary["fixture_count"] == 1
+    assert summary["corpus_sha256"] == profile_quality_corpus_sha256(corpus)
+    assert summary["model_release"] == authorization.model_release.model_dump(mode="json")
+    assert _SOURCE not in captured.out
+    assert authorization.approver_id not in captured.out
+    assert str(corpus_path) not in captured.out
+    assert str(authorization_path) not in captured.out
+
+
+def test_preflight_cli_rejects_inactive_authorization_with_opaque_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    corpus = _corpus()
+    authorization = _authorization(
+        corpus,
+        approved_at=_NOW - timedelta(hours=2),
+        expires_at=_NOW - timedelta(hours=1),
+    )
+    corpus_path = tmp_path / "secret-corpus-name.json"
+    authorization_path = tmp_path / "secret-authorization-name.json"
+    write_private_quality_artifact(corpus_path, corpus)
+    write_private_quality_artifact(authorization_path, authorization)
+
+    status = main(("preflight", str(corpus_path), str(authorization_path)), now=_NOW)
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.out == ""
+    assert json.loads(captured.err) == {"error_type": "ValueError", "status": "invalid"}
+    assert _SOURCE not in captured.err
+    assert str(corpus_path) not in captured.err
 
 
 def test_generate_cli_rejects_existing_output_before_provider_call(

@@ -122,6 +122,7 @@ uv run ai-interviewer-profile-quality schema predictions
 uv run ai-interviewer-profile-quality schema review-draft
 uv run ai-interviewer-profile-quality schema evidence
 uv run ai-interviewer-profile-quality schema approval
+uv run ai-interviewer-profile-quality preflight <corpus.json> <authorization.json>
 uv run ai-interviewer-profile-quality generate <corpus.json> <authorization.json> <predictions.json> --confirm-external-processing
 uv run ai-interviewer-profile-quality prepare-review <corpus.json> <predictions.json> <review-draft.json>
 uv run ai-interviewer-profile-quality finalize-review <corpus.json> <predictions.json> <completed-review.json> <quality-evidence.json>
@@ -129,7 +130,11 @@ uv run ai-interviewer-profile-quality evaluate <quality-evidence.json>
 uv run ai-interviewer-profile-quality gate <quality-evidence.json> <approval.json>
 ```
 
-Exit codes are `0` for a completed generation/preparation/finalization or eligible/approved gate,
+`preflight` performs the complete corpus/prompt/digest/active-window authorization check
+without constructing a provider gateway, reading a credential, or making an external
+request. Its output contains only safe coordinates, counts, timestamps, and digests.
+
+Exit codes are `0` for an authorized preflight, completed generation/preparation/finalization, or eligible/approved gate,
 `2` for invalid input or authorization, `3` for a valid but blocked evaluation, and `4`
 for a valid but blocked approval gate. A completed prediction run can contain safe
 per-fixture failures; those are measured later instead of being mistaken for approval.

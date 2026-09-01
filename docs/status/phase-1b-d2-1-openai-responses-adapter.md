@@ -36,7 +36,9 @@ external request.
 - no OpenAI call, billing event, model prediction, or quality claim was produced;
 - no rights-cleared production-scale AZ/EN CV/JD corpus or exhaustive adjudication exists;
 - no processor agreement, region/data-control approval, country activation, public job
-  scheduling route, or continuous worker supervisor is added;
+  scheduling route, or continuous worker supervisor was added by D2.1; the later
+  disabled-by-default runtime is governed by
+  [ADR 0028](../adr/0028-disabled-by-default-worker-supervision.md);
 - no four-role Phase 1B-D2 approval exists.
 
 ## Local verification

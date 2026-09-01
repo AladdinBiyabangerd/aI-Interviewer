@@ -100,6 +100,14 @@ async def test_disabled_file_security_is_ready_but_content_fails_closed() -> Non
             account_id=uuid4(),
             file_asset_id=uuid4(),
         )
+    with pytest.raises(FileSecurityUnavailableError):
+        await disabled.read_for_parser(
+            account_id=uuid4(),
+            file_asset_id=uuid4(),
+            parser_adapter="isolated-text-parser",
+            parser_version="1",
+            isolation_profile="no-network-readonly-v1",
+        )
     assert (
         await disabled.schedule_account_deletion(
             None,  # type: ignore[arg-type]
