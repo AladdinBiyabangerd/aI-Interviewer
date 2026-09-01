@@ -7,13 +7,18 @@ from sqlalchemy.exc import DBAPIError
 from tests.integration.test_candidate_documents import _delete_test_assets
 from tests.integration.test_candidate_source_texts import _attached_document_version
 from tests.integration.test_file_security import _application_keyring
+from tests.integration.test_privacy import _create_privacy_context
 
 from ai_interviewer.candidate_inputs.extraction_jobs import (
     CandidateExtractionJobConflictError,
     CandidateExtractionJobNotFoundError,
     CandidateExtractionJobService,
 )
-from ai_interviewer.candidate_inputs.extraction_models import CandidateExtractionJob
+from ai_interviewer.candidate_inputs.extraction_models import (
+    EXTRACTION_LEASE_SECONDS,
+    MAX_EXTRACTION_ATTEMPTS,
+    CandidateExtractionJob,
+)
 from ai_interviewer.candidate_inputs.source_texts import CandidateSourceTextService
 from ai_interviewer.persistence.database import Database
 
@@ -147,8 +152,13 @@ async def test_extraction_job_schedule_is_owner_scoped_and_snapshot_bound(
         "extraction-job-owner",
     )
     jobs = CandidateExtractionJobService(database)
-    with pytest.raises(CandidateExtractionJobNotFoundError):
+    with pytest.raises(CandidateExtractionJobConflictError, match="account cannot process"):
         await jobs.schedule_extraction(uuid4(), attached.attached_version.version_id, None)
+    with pytest.raises(CandidateExtractionJobNotFoundError):
+        other_owner = (await _create_privacy_context(database)).account_id
+        await jobs.schedule_extraction(other_owner, attached.attached_version.version_id, None)
+    with pytest.raises(CandidateExtractionJobNotFoundError):
+        await jobs.schedule_extraction(account_id, uuid4(), None)
 
     scheduled = await jobs.schedule_extraction(
         account_id,
@@ -164,4 +174,62 @@ async def test_extraction_job_schedule_is_owner_scoped_and_snapshot_bound(
         files,
         {asset.id},
         worker_id="extraction-job-owner-cleanup",
+    )
+
+
+@pytest.mark.asyncio
+async def test_expired_final_lease_becomes_a_terminal_failure(database: Database) -> None:
+    account_id, _, _, files, asset, attached, _ = await _attached_document_version(
+        database,
+        "extraction-job-expired-lease",
+    )
+    jobs = CandidateExtractionJobService(database)
+    now = datetime.now(UTC)
+    scheduled = await jobs.schedule_extraction(
+        account_id,
+        attached.attached_version.version_id,
+        "expired-lease-schedule",
+        now=now,
+    )
+    claim = (await jobs.claim_jobs("expired-lease-worker", 1, now=now))[0]
+    assert claim.lease_token is not None
+
+    current = claim
+    for attempt in range(1, MAX_EXTRACTION_ATTEMPTS):
+        failed = await jobs.mark_failed(
+            current.job_id,
+            "expired-lease-worker",
+            current.lease_token,
+            "parser_timeout",
+            now=now + timedelta(seconds=attempt * 1_000),
+        )
+        assert failed.status == "retry"
+        current = (
+            await jobs.claim_jobs(
+                "expired-lease-worker",
+                1,
+                now=failed.available_at,
+            )
+        )[0]
+
+    assert current.attempts == MAX_EXTRACTION_ATTEMPTS
+    assert current.lease_token is not None
+    assert current.locked_at is not None
+    exhausted_at = now + timedelta(seconds=MAX_EXTRACTION_ATTEMPTS * 2_000)
+    assert exhausted_at - current.locked_at > timedelta(seconds=EXTRACTION_LEASE_SECONDS)
+    assert await jobs.claim_jobs("expired-lease-recovery", 1, now=exhausted_at) == ()
+
+    async with database.transaction() as session:
+        expired = await session.get(CandidateExtractionJob, scheduled.job.job_id)
+    assert expired is not None
+    assert expired.status == "failed"
+    assert expired.error_code == "lease_expired"
+    assert expired.completed_at == exhausted_at
+    assert expired.lease_token is None
+
+    await _delete_test_assets(
+        database,
+        files,
+        {asset.id},
+        worker_id="extraction-job-expired-lease-cleanup",
     )

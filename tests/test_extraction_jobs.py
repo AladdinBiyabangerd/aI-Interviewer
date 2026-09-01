@@ -1,13 +1,16 @@
 import base64
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import cast
 from uuid import uuid4
 
 import pytest
 from pydantic import SecretStr
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_interviewer.candidate_inputs.extraction_jobs import (
+    CandidateExtractionJobConflictError,
     CandidateExtractionJobService,
     CandidateExtractionJobUnavailableError,
     FailClosedCandidateExtractionJobService,
@@ -60,6 +63,112 @@ def test_extraction_job_policy_constants_are_bounded() -> None:
     assert CandidateExtractionJobService._retry_delay(99) == timedelta(hours=1)
 
 
+def _processable_snapshot() -> tuple[
+    SimpleNamespace,
+    SimpleNamespace,
+    SimpleNamespace,
+    SimpleNamespace,
+    SimpleNamespace,
+]:
+    now = datetime.now(UTC)
+    privacy_policy_id = uuid4()
+    parser_policy_id = uuid4()
+    document_version = SimpleNamespace(
+        version_number=1,
+        retain_until=now + timedelta(days=1),
+        parser_release_policy_id=parser_policy_id,
+        privacy_policy_version_id=privacy_policy_id,
+        jurisdiction_code="AZERBAIJAN",
+        media_type="text/plain",
+        content_length=10,
+        content_sha256="a" * 64,
+    )
+    preparation = SimpleNamespace(
+        status="draft",
+        retain_until=now + timedelta(days=1),
+        retention_action="delete",
+        privacy_policy_version_id=privacy_policy_id,
+        jurisdiction_code="AZERBAIJAN",
+    )
+    document = SimpleNamespace(latest_version_number=1)
+    asset = SimpleNamespace(
+        status="released",
+        released_object_key="released/test",
+        released_version_id="version-1",
+        released_at=now,
+        parser_release_policy_id=parser_policy_id,
+        privacy_policy_version_id=privacy_policy_id,
+        jurisdiction_code="AZERBAIJAN",
+        data_category="candidate_document",
+        purpose="interview_preparation",
+        content_sha256="a" * 64,
+        content_length=10,
+        media_type="text/plain",
+        retain_until=document_version.retain_until,
+        retention_action="delete",
+    )
+    policy = SimpleNamespace(
+        status="active",
+        approved_at=now - timedelta(seconds=1),
+        id=parser_policy_id,
+        privacy_policy_version_id=privacy_policy_id,
+        data_category="candidate_document",
+        purpose="interview_preparation",
+        media_type="text/plain",
+        maximum_bytes=10,
+        malware_scan_required=True,
+    )
+    return preparation, document, document_version, asset, policy
+
+
+@pytest.mark.parametrize(
+    ("target", "attribute", "value", "message"),
+    [
+        ("preparation", "status", "archived", "archived"),
+        (
+            "preparation",
+            "retain_until",
+            datetime.min.replace(tzinfo=UTC),
+            "privacy snapshot",
+        ),
+        ("document", "latest_version_number", 2, "latest document version"),
+        (
+            "document_version",
+            "retain_until",
+            datetime.min.replace(tzinfo=UTC),
+            "retention deadline",
+        ),
+        ("asset", "status", "quarantined", "exact released asset"),
+        ("policy", "status", "retired", "exact parser release"),
+    ],
+)
+def test_processable_snapshot_rejects_each_unsafe_lineage(
+    target: str,
+    attribute: str,
+    value: object,
+    message: str,
+) -> None:
+    preparation, document, document_version, asset, policy = _processable_snapshot()
+    objects = {
+        "preparation": preparation,
+        "document": document,
+        "document_version": document_version,
+        "asset": asset,
+        "policy": policy,
+    }
+    setattr(objects[target], attribute, value)
+
+    with pytest.raises(CandidateExtractionJobConflictError, match=message):
+        CandidateExtractionJobService._require_processable_snapshot(
+            preparation,
+            document,
+            document_version,
+            asset,
+            policy,
+            datetime.now(UTC),
+        )
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("worker_id", ["", " worker ", "x" * 129])
 async def test_claim_rejects_invalid_worker_before_database_access(worker_id: str) -> None:
@@ -99,7 +208,22 @@ async def test_builder_and_disabled_runtime_fail_closed() -> None:
     )
     assert isinstance(disabled, FailClosedCandidateExtractionJobService)
     with pytest.raises(CandidateExtractionJobUnavailableError):
+        await disabled.schedule_extraction(uuid4(), uuid4(), None)
+    with pytest.raises(CandidateExtractionJobUnavailableError):
         await disabled.claim_jobs("parser-worker-1", 1)
+    with pytest.raises(CandidateExtractionJobUnavailableError):
+        await disabled.mark_succeeded(uuid4(), "parser-worker-1", uuid4(), uuid4())
+    with pytest.raises(CandidateExtractionJobUnavailableError):
+        await disabled.mark_failed(uuid4(), "parser-worker-1", uuid4(), "input_corrupt")
+    # Export must degrade gracefully (empty, not raising) so a disabled subsystem
+    # never breaks another account's privacy export request.
+    assert (
+        await disabled.export_account_job_metadata(
+            cast(AsyncSession, object()),
+            account_id=uuid4(),
+        )
+        == []
+    )
 
     enabled_settings = Settings(_env_file=None, environment="test").model_copy(
         update={

@@ -127,6 +127,13 @@ class CandidateSourceTextRuntime(Protocol):
         now: datetime | None = None,
     ) -> CandidateSourceTextRecord: ...
 
+    async def export_account_source_text_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]: ...
+
 
 class FailClosedCandidateSourceTextService:
     """Reject source-text commands until privacy cryptography is available."""
@@ -171,6 +178,15 @@ class FailClosedCandidateSourceTextService:
         del account_id, preparation_id, document_version_id, content, request_id, now
         del expected_version
         self._unavailable()
+
+    async def export_account_source_text_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]:
+        del session, account_id
+        return []
 
 
 class CandidateSourceTextService:
@@ -559,6 +575,51 @@ class CandidateSourceTextService:
             )
             await session.flush()
             return await self._record(session, source_text)
+
+    async def export_account_source_text_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]:
+        source_texts = list(
+            (
+                await session.scalars(
+                    select(CandidateSourceText)
+                    .where(CandidateSourceText.owner_id == account_id)
+                    .order_by(CandidateSourceText.created_at, CandidateSourceText.id)
+                )
+            ).all()
+        )
+        items: list[dict[str, object]] = []
+        for source_text in source_texts:
+            record = await self._record(session, source_text)
+            items.append(self._export_record(record))
+        return items
+
+    @staticmethod
+    def _export_record(record: CandidateSourceTextRecord) -> dict[str, object]:
+        return {
+            "source_text_id": str(record.source_text_id),
+            "document_version_id": str(record.document_version_id),
+            "latest_version_number": record.latest_version_number,
+            "created_at": record.created_at.isoformat(),
+            "updated_at": record.updated_at.isoformat(),
+            "versions": [
+                {
+                    "version_number": version.version_number,
+                    "origin": version.origin,
+                    "parser_adapter": version.parser_adapter,
+                    "parser_version": version.parser_version,
+                    "isolation_profile": version.isolation_profile,
+                    "character_count": version.character_count,
+                    "line_count": version.line_count,
+                    "created_at": version.created_at.isoformat(),
+                    "content": version.content,
+                }
+                for version in record.versions
+            ],
+        }
 
     async def _owned_lineage(
         self,

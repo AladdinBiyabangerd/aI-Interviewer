@@ -19,6 +19,8 @@ DatabaseTLSMode = Literal["disable", "require", "verify-ca", "verify-full"]
 OIDCAlgorithm = Literal["RS256", "ES256"]
 _RELEASE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _RELEASE_REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+_MODEL_COORDINATE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
+_WORKER_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 
 def normalize_release_id(value: str) -> str:
@@ -116,6 +118,27 @@ class Settings(BaseSettings):
     malware_scanner_tcp_port: int = Field(default=3310, ge=1, le=65_535)
     malware_scanner_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
     malware_scanner_max_signature_age_hours: int = Field(default=48, ge=1, le=168)
+    model_gateway_enabled: bool = False
+    model_gateway_provider: str | None = None
+    model_gateway_model_id: str | None = None
+    model_gateway_model_version: str | None = None
+    openai_api_key: SecretStr | None = None
+    openai_api_key_file: Path | None = None
+    model_gateway_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+    model_gateway_max_attempts: int = Field(default=3, ge=1, le=5)
+    model_gateway_retry_base_seconds: float = Field(default=0.25, ge=0, le=5)
+    model_gateway_max_input_characters: int = Field(
+        default=250_000,
+        ge=1_000,
+        le=1_000_000,
+    )
+    model_gateway_max_output_characters: int = Field(
+        default=100_000,
+        ge=1_000,
+        le=1_000_000,
+    )
+    profiling_worker_enabled: bool = False
+    profiling_worker_id: str = "candidate-profiling-worker"
 
     @model_validator(mode="before")
     @classmethod
@@ -130,6 +153,7 @@ class Settings(BaseSettings):
         secret_pairs = (
             ("database_url", "database_url_file"),
             ("privacy_keyring", "privacy_keyring_file"),
+            ("openai_api_key", "openai_api_key_file"),
         )
         for value_field, file_field in secret_pairs:
             file_value = values.get(file_field)
@@ -329,6 +353,44 @@ class Settings(BaseSettings):
             raise ValueError("malware scanner host is invalid")
         return normalized
 
+    @field_validator(
+        "model_gateway_provider",
+        "model_gateway_model_id",
+        "model_gateway_model_version",
+    )
+    @classmethod
+    def validate_model_gateway_coordinate(cls, value: str | None, info: Any) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not _MODEL_COORDINATE_PATTERN.fullmatch(normalized):
+            raise ValueError("model gateway coordinates must be bounded release identifiers")
+        if info.field_name == "model_gateway_provider":
+            return normalized.lower()
+        return normalized
+
+    @field_validator("openai_api_key")
+    @classmethod
+    def validate_openai_api_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        secret = value.get_secret_value()
+        if (
+            not 20 <= len(secret.encode("utf-8")) <= 512
+            or any(character.isspace() or ord(character) < 32 for character in secret)
+            or secret.casefold() in {"change-me", "local-only", "password", "secret"}
+        ):
+            raise ValueError("OpenAI API key must be a bounded non-placeholder secret")
+        return value
+
+    @field_validator("profiling_worker_id")
+    @classmethod
+    def validate_profiling_worker_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not _WORKER_ID_PATTERN.fullmatch(normalized):
+            raise ValueError("profiling worker ID must be a bounded operational identifier")
+        return normalized
+
     @model_validator(mode="after")
     def validate_hosted_safety(self) -> Self:
         hosted = self.environment in {"staging", "production"}
@@ -430,6 +492,45 @@ class Settings(BaseSettings):
                 raise ValueError("hosted malware scanning requires a local Unix socket")
             if not self.malware_scanner_unix_socket.is_absolute():
                 raise ValueError("hosted malware scanner socket path must be absolute")
+
+        model_coordinates = (
+            self.model_gateway_provider,
+            self.model_gateway_model_id,
+            self.model_gateway_model_version,
+        )
+        if self.model_gateway_enabled and not all(model_coordinates):
+            raise ValueError("enabled model gateway requires provider, model ID, and model version")
+        if not self.model_gateway_enabled and any(model_coordinates):
+            raise ValueError("model gateway coordinates require the gateway to be enabled")
+        openai_credentials_configured = (
+            self.openai_api_key is not None or self.openai_api_key_file is not None
+        )
+        if self.model_gateway_enabled and self.model_gateway_provider == "openai":
+            if self.openai_api_key is None:
+                raise ValueError("enabled OpenAI model gateway requires an API key")
+            if hosted and self.openai_api_key_file is None:
+                raise ValueError("hosted OpenAI credentials require openai_api_key_file")
+        elif openai_credentials_configured:
+            raise ValueError("OpenAI credentials require the enabled OpenAI model gateway")
+        if self.profiling_worker_enabled:
+            if (
+                not self.model_gateway_enabled
+                or not self.privacy_enabled
+                or not self.file_security_enabled
+            ):
+                raise ValueError(
+                    "profiling worker requires model gateway, privacy, and file security"
+                )
+            retry_delay = self.model_gateway_retry_base_seconds * sum(
+                2**attempt for attempt in range(self.model_gateway_max_attempts - 1)
+            )
+            maximum_gateway_seconds = (
+                self.model_gateway_timeout_seconds * self.model_gateway_max_attempts + retry_delay
+            )
+            if maximum_gateway_seconds > 240:
+                raise ValueError(
+                    "profiling worker model retry budget must fit within the fenced lease"
+                )
         if self.telemetry_enabled and self.telemetry_otlp_endpoint is None:
             raise ValueError("enabled telemetry requires an OTLP endpoint")
         if not self.telemetry_enabled and self.telemetry_otlp_endpoint is not None:

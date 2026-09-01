@@ -224,11 +224,15 @@ async def test_access_export_is_machine_readable_and_idempotent(database: Databa
     assert first.request_id == repeated.request_id
     assert first.status == "completed"
     assert first.data is not None
-    assert first.data["schema_version"] == "phase-1a-c.1"
+    assert first.data["schema_version"] == "phase-1b-c2"
     assert first.data["candidate_document_intakes"] == []
     assert first.data["stored_files"] == []
     assert first.data["candidate_documents"] == []
     assert first.data["candidate_preparations"] == []
+    assert first.data["candidate_source_texts"] == []
+    assert first.data["candidate_extraction_jobs"] == []
+    assert first.data["candidate_profiles"] == []
+    assert first.data["candidate_profiling_jobs"] == []
     assert first.data["account"]["identity_subject"] == context.subject
     assert first.data["privacy_profile"]["jurisdiction_codes"] == [
         "AZERBAIJAN",

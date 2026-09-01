@@ -9,11 +9,13 @@ from tests.integration.test_candidate_documents import (
     _released_asset,
 )
 from tests.integration.test_file_security import _application_keyring
+from tests.integration.test_privacy import _create_privacy_context
 
 from ai_interviewer.candidate_inputs.documents import (
     AttachDocumentVersionResult,
     CandidateDocumentService,
 )
+from ai_interviewer.candidate_inputs.extraction_jobs import CandidateExtractionJobService
 from ai_interviewer.candidate_inputs.source_text_models import (
     CandidateSourceText,
     CandidateSourceTextVersion,
@@ -29,6 +31,8 @@ from ai_interviewer.file_security.lifecycle import FileSecurityService
 from ai_interviewer.file_security.models import FileAsset, ParserReleasePolicy
 from ai_interviewer.persistence.database import Database
 from ai_interviewer.persistence.models import AuditEvent, OutboxEvent
+from ai_interviewer.privacy.lifecycle import PrivacyLifecycleService
+from ai_interviewer.privacy.policy import build_default_jurisdiction_registry
 
 pytestmark = pytest.mark.integration
 
@@ -318,8 +322,9 @@ async def test_correction_append_is_optimistic_idempotent_and_owner_scoped(
             "correction-wrong-preparation",
         )
     with pytest.raises(CandidateSourceTextNotFoundError):
+        other_owner = (await _create_privacy_context(database)).account_id
         await source_texts.append_correction(
-            uuid4(),
+            other_owner,
             preparation_id,
             document_version_id,
             corrected,
@@ -353,4 +358,93 @@ async def test_correction_append_is_optimistic_idempotent_and_owner_scoped(
         files,
         {asset.id},
         worker_id="candidate-source-text-correction-cleanup",
+    )
+
+
+@pytest.mark.asyncio
+async def test_privacy_export_includes_source_text_and_job_metadata(
+    database: Database,
+) -> None:
+    (
+        account_id,
+        preparation_id,
+        _,
+        files,
+        asset,
+        attached,
+        parser,
+    ) = await _attached_document_version(database, "export-lineage")
+    document_version_id = attached.attached_version.version_id
+    source_texts = CandidateSourceTextService(database, _application_keyring())
+    jobs = CandidateExtractionJobService(database)
+
+    await jobs.schedule_extraction(
+        account_id,
+        document_version_id,
+        "export-lineage-schedule",
+    )
+    claimed = (await jobs.claim_jobs("export-lineage-worker", 1))[0]
+    original = "Parsed CV text visible to a privacy export request."
+    stored = await source_texts.store_parser_extraction(
+        account_id,
+        document_version_id,
+        original,
+        parser,
+        "export-lineage-store",
+    )
+    assert claimed.lease_token is not None
+    await jobs.mark_succeeded(
+        claimed.job_id,
+        "export-lineage-worker",
+        claimed.lease_token,
+        stored.source_text.source_text_id,
+    )
+    corrected = "Parsed CV text after an owner correction, visible to export too."
+    await source_texts.append_correction(
+        account_id,
+        preparation_id,
+        document_version_id,
+        corrected,
+        1,
+        "export-lineage-correction",
+    )
+
+    privacy = PrivacyLifecycleService(
+        database=database,
+        registry=build_default_jurisdiction_registry(),
+        subject_hmac_key=b"candidate-source-text-export-hmac-key" * 2,
+        candidate_source_text_lifecycle=source_texts,
+        candidate_extraction_job_lifecycle=jobs,
+    )
+    exported = await privacy.create_request(
+        account_id,
+        "export",
+        "candidate-source-text-export-key",
+        "candidate-source-text-export",
+    )
+    assert exported.data is not None
+    assert exported.data["schema_version"] == "phase-1b-c2"
+
+    text_entries = exported.data["candidate_source_texts"]
+    assert len(text_entries) == 1
+    entry = text_entries[0]
+    assert entry["document_version_id"] == str(document_version_id)
+    assert entry["latest_version_number"] == 2
+    contents = {version["content"] for version in entry["versions"]}
+    assert contents == {original, corrected}
+    origins = {version["origin"] for version in entry["versions"]}
+    assert origins == {"parser_extraction", "user_correction"}
+
+    job_entries = exported.data["candidate_extraction_jobs"]
+    assert len(job_entries) == 1
+    job_entry = job_entries[0]
+    assert job_entry["document_version_id"] == str(document_version_id)
+    assert job_entry["status"] == "succeeded"
+    assert job_entry["source_text_id"] == str(stored.source_text.source_text_id)
+
+    await _delete_test_assets(
+        database,
+        files,
+        {asset.id},
+        worker_id="candidate-source-text-export-cleanup",
     )

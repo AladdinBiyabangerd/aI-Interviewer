@@ -391,7 +391,7 @@ async def test_privacy_export_and_deletion_cover_document_lineage(
         "candidate-document-export",
     )
     assert exported.data is not None
-    assert exported.data["schema_version"] == "phase-1a-c.1"
+    assert exported.data["schema_version"] == "phase-1b-c2"
     assert exported.data["candidate_document_intakes"] == []
     lineage = exported.data["candidate_documents"][0]
     assert lineage["document_id"] == str(attached.document.document_id)

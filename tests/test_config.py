@@ -99,6 +99,43 @@ def test_release_revision_is_normalized() -> None:
     assert settings.release_revision == "a" * 40
 
 
+def test_profiling_worker_requires_secure_model_boundary_and_fits_job_lease() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="requires model gateway, privacy, and file security",
+    ):
+        Settings(_env_file=None, profiling_worker_enabled=True)
+
+    values = {
+        "_env_file": None,
+        "privacy_enabled": True,
+        "privacy_keyring": _keyring_json(),
+        "file_security_enabled": True,
+        "object_storage_bucket": "candidate-files",
+        "object_storage_region": "az-primary",
+        "object_storage_kms_key_id": "candidate-key",
+        "malware_scanner_tcp_host": "127.0.0.1",
+        "model_gateway_enabled": True,
+        "model_gateway_provider": "test-provider",
+        "model_gateway_model_id": "structured-profile-model",
+        "model_gateway_model_version": "2026-09-01",
+        "profiling_worker_enabled": True,
+    }
+    enabled = Settings(**values)
+    assert enabled.profiling_worker_enabled
+    assert enabled.profiling_worker_id == "candidate-profiling-worker"
+
+    with pytest.raises(ValidationError, match="fit within the fenced lease"):
+        Settings(
+            **values,
+            model_gateway_timeout_seconds=100,
+            model_gateway_max_attempts=3,
+        )
+
+    with pytest.raises(ValidationError, match="bounded operational identifier"):
+        Settings(**values, profiling_worker_id="unsafe worker")
+
+
 @pytest.mark.parametrize(
     "endpoint",
     [

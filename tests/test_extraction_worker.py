@@ -44,6 +44,7 @@ def _job_record(**overrides: object) -> CandidateExtractionJobRecord:
         "jurisdiction_code": "AZ",
         "legal_basis": "consent",
         "retain_until": datetime(2027, 8, 29, tzinfo=UTC),
+        "retention_action": "delete",
         "media_type": "text/plain",
         "content_length": 128,
         "content_sha256": "a" * 64,

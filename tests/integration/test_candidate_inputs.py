@@ -254,7 +254,7 @@ async def test_privacy_export_and_deletion_include_candidate_context(database: D
         "candidate-context-export",
     )
     assert exported.data is not None
-    assert exported.data["schema_version"] == "phase-1a-c.1"
+    assert exported.data["schema_version"] == "phase-1b-c2"
     assert exported.data["candidate_document_intakes"] == []
     assert exported.data["candidate_preparations"][0]["preparation_id"] == str(
         created.preparation.id

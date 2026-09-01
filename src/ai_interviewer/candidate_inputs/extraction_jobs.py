@@ -77,6 +77,7 @@ class CandidateExtractionJobRecord:
     jurisdiction_code: str
     legal_basis: str
     retain_until: datetime
+    retention_action: str
     media_type: str
     content_length: int
     content_sha256: str
@@ -140,6 +141,13 @@ class CandidateExtractionJobRuntime(Protocol):
         now: datetime | None = None,
     ) -> CandidateExtractionJobRecord: ...
 
+    async def export_account_job_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]: ...
+
 
 class FailClosedCandidateExtractionJobService:
     """Reject extraction work until all upstream security boundaries are configured."""
@@ -192,6 +200,15 @@ class FailClosedCandidateExtractionJobService:
     ) -> CandidateExtractionJobRecord:
         del job_id, worker_id, lease_token, error_code, now
         self._unavailable()
+
+    async def export_account_job_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]:
+        del session, account_id
+        return []
 
 
 class CandidateExtractionJobService:
@@ -415,6 +432,11 @@ class CandidateExtractionJobService:
                 job.error_code = None
                 job.updated_at = claimed_at
             await session.flush()
+            # PostgreSQL may expire server-managed fields after the state update. Refresh
+            # before synchronously building the dataclass so an async lazy-load is never
+            # attempted while serializing the claim result.
+            for job in jobs:
+                await session.refresh(job)
             return tuple(self._record(job) for job in jobs)
 
     async def mark_succeeded(
@@ -510,6 +532,40 @@ class CandidateExtractionJobService:
             )
             await session.flush()
             return self._record(job)
+
+    async def export_account_job_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]:
+        jobs = list(
+            (
+                await session.scalars(
+                    select(CandidateExtractionJob)
+                    .where(CandidateExtractionJob.owner_id == account_id)
+                    .order_by(CandidateExtractionJob.created_at, CandidateExtractionJob.id)
+                )
+            ).all()
+        )
+        return [self._export_job_record(job) for job in jobs]
+
+    @staticmethod
+    def _export_job_record(job: CandidateExtractionJob) -> dict[str, object]:
+        return {
+            "job_id": str(job.id),
+            "document_version_id": str(job.document_version_id),
+            "status": job.status,
+            "attempts": job.attempts,
+            "parser_adapter": job.parser_adapter,
+            "parser_version": job.parser_version,
+            "isolation_profile": job.isolation_profile,
+            "error_code": job.error_code,
+            "source_text_id": str(job.source_text_id) if job.source_text_id else None,
+            "created_at": job.created_at.isoformat(),
+            "updated_at": job.updated_at.isoformat(),
+            "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+        }
 
     @staticmethod
     def _validate_worker(worker_id: str) -> None:
@@ -616,6 +672,7 @@ class CandidateExtractionJobService:
             jurisdiction_code=job.jurisdiction_code,
             legal_basis=job.legal_basis,
             retain_until=job.retain_until,
+            retention_action=job.retention_action,
             media_type=job.media_type,
             content_length=job.content_length,
             content_sha256=job.content_sha256,

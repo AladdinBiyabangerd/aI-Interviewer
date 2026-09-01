@@ -191,6 +191,66 @@ class CandidateDocumentIntakeLifecycleAdapter(Protocol):
     ) -> int: ...
 
 
+class CandidateSourceTextLifecycleAdapter(Protocol):
+    """Narrow privacy contract for exporting decrypted source-text lineage.
+
+    No erase method exists: `candidate_source_texts` rows are always tied to an
+    owner-scoped `candidate_document_versions` row (`ON DELETE CASCADE`, never
+    orphaned), so `CandidateDocumentLifecycleAdapter.erase_account_document_metadata`
+    already removes them.
+    """
+
+    async def export_account_source_text_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]: ...
+
+
+class CandidateExtractionJobLifecycleAdapter(Protocol):
+    """Narrow privacy contract for exporting extraction-job operational metadata.
+
+    No erase method exists for the same cascade reason as source-text lineage.
+    """
+
+    async def export_account_job_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]: ...
+
+
+class CandidateProfileLifecycleAdapter(Protocol):
+    """Narrow privacy contract for exporting decrypted derived profile lineage.
+
+    Profile rows cascade from exact source/document lineage, so document erasure
+    remains the one deletion coordinator and cannot leave derived-data orphans.
+    """
+
+    async def export_account_profile_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]: ...
+
+
+class CandidateProfilingJobLifecycleAdapter(Protocol):
+    """Narrow privacy contract for profiling-job operational metadata.
+
+    Jobs cascade from exact source/document lineage and contain no candidate content.
+    """
+
+    async def export_account_profiling_job_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]: ...
+
+
 class _NoFileLifecycle:
     async def schedule_account_deletion(
         self,
@@ -284,6 +344,50 @@ class _NoCandidateDocumentIntakeLifecycle:
         return 0
 
 
+class _NoCandidateSourceTextLifecycle:
+    async def export_account_source_text_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]:
+        del session, account_id
+        return []
+
+
+class _NoCandidateExtractionJobLifecycle:
+    async def export_account_job_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]:
+        del session, account_id
+        return []
+
+
+class _NoCandidateProfileLifecycle:
+    async def export_account_profile_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]:
+        del session, account_id
+        return []
+
+
+class _NoCandidateProfilingJobLifecycle:
+    async def export_account_profiling_job_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+    ) -> list[dict[str, object]]:
+        del session, account_id
+        return []
+
+
 class PrivacyRuntime(Protocol):
     async def configure_profile(
         self, account_id: UUID, profile_input: ProfileInput, request_id: str | None
@@ -298,6 +402,14 @@ class PrivacyRuntime(Protocol):
     ) -> ConsentRecord: ...
 
     async def list_consents(self, account_id: UUID) -> list[ConsentRecord]: ...
+
+    async def register_processor_use(
+        self,
+        account_id: UUID,
+        *,
+        processor_activity_id: UUID,
+        processor_subject_reference: str,
+    ) -> ProcessorUsage: ...
 
     async def create_request(
         self,
@@ -343,6 +455,16 @@ class FailClosedPrivacyService:
         del account_id
         self._unavailable()
 
+    async def register_processor_use(
+        self,
+        account_id: UUID,
+        *,
+        processor_activity_id: UUID,
+        processor_subject_reference: str,
+    ) -> ProcessorUsage:
+        del account_id, processor_activity_id, processor_subject_reference
+        self._unavailable()
+
     async def create_request(
         self,
         account_id: UUID,
@@ -380,6 +502,10 @@ class PrivacyLifecycleService:
         candidate_document_intake_lifecycle: (
             CandidateDocumentIntakeLifecycleAdapter | None
         ) = None,
+        candidate_source_text_lifecycle: CandidateSourceTextLifecycleAdapter | None = None,
+        candidate_extraction_job_lifecycle: (CandidateExtractionJobLifecycleAdapter | None) = None,
+        candidate_profile_lifecycle: CandidateProfileLifecycleAdapter | None = None,
+        candidate_profiling_job_lifecycle: (CandidateProfilingJobLifecycleAdapter | None) = None,
         max_processor_deletion_attempts: int = 10,
         processor_retry_base_seconds: int = 60,
         telemetry: TelemetryRuntime | None = None,
@@ -397,6 +523,18 @@ class PrivacyLifecycleService:
         )
         self._candidate_document_intake_lifecycle = (
             candidate_document_intake_lifecycle or _NoCandidateDocumentIntakeLifecycle()
+        )
+        self._candidate_source_text_lifecycle = (
+            candidate_source_text_lifecycle or _NoCandidateSourceTextLifecycle()
+        )
+        self._candidate_extraction_job_lifecycle = (
+            candidate_extraction_job_lifecycle or _NoCandidateExtractionJobLifecycle()
+        )
+        self._candidate_profile_lifecycle = (
+            candidate_profile_lifecycle or _NoCandidateProfileLifecycle()
+        )
+        self._candidate_profiling_job_lifecycle = (
+            candidate_profiling_job_lifecycle or _NoCandidateProfilingJobLifecycle()
         )
         self._subject_hmac_key = subject_hmac_key
         self._application_keyring = application_keyring
@@ -1346,8 +1484,32 @@ class PrivacyLifecycleService:
                 account_id=account_id,
             )
         )
+        candidate_source_texts = (
+            await self._candidate_source_text_lifecycle.export_account_source_text_metadata(
+                session,
+                account_id=account_id,
+            )
+        )
+        candidate_extraction_jobs = (
+            await self._candidate_extraction_job_lifecycle.export_account_job_metadata(
+                session,
+                account_id=account_id,
+            )
+        )
+        candidate_profiles = (
+            await self._candidate_profile_lifecycle.export_account_profile_metadata(
+                session,
+                account_id=account_id,
+            )
+        )
+        candidate_profiling_jobs = (
+            await self._candidate_profiling_job_lifecycle.export_account_profiling_job_metadata(
+                session,
+                account_id=account_id,
+            )
+        )
         return {
-            "schema_version": "phase-1a-c.1",
+            "schema_version": "phase-1b-c2",
             "generated_at": generated_at.isoformat(),
             "account": {
                 "account_id": str(account.id),
@@ -1410,6 +1572,10 @@ class PrivacyLifecycleService:
             "candidate_preparations": candidate_preparations,
             "candidate_documents": candidate_documents,
             "candidate_document_intakes": candidate_document_intakes,
+            "candidate_source_texts": candidate_source_texts,
+            "candidate_extraction_jobs": candidate_extraction_jobs,
+            "candidate_profiles": candidate_profiles,
+            "candidate_profiling_jobs": candidate_profiling_jobs,
             "audit_evidence": [
                 {
                     "action": event.action,
@@ -1488,6 +1654,10 @@ def build_privacy_service(
     candidate_data_lifecycle: CandidateDataLifecycleAdapter | None = None,
     candidate_document_lifecycle: CandidateDocumentLifecycleAdapter | None = None,
     candidate_document_intake_lifecycle: CandidateDocumentIntakeLifecycleAdapter | None = None,
+    candidate_source_text_lifecycle: CandidateSourceTextLifecycleAdapter | None = None,
+    candidate_extraction_job_lifecycle: CandidateExtractionJobLifecycleAdapter | None = None,
+    candidate_profile_lifecycle: CandidateProfileLifecycleAdapter | None = None,
+    candidate_profiling_job_lifecycle: CandidateProfilingJobLifecycleAdapter | None = None,
     telemetry: TelemetryRuntime | None = None,
 ) -> PrivacyRuntime:
     if not settings.privacy_enabled:
@@ -1511,6 +1681,10 @@ def build_privacy_service(
         candidate_data_lifecycle=candidate_data_lifecycle,
         candidate_document_lifecycle=candidate_document_lifecycle,
         candidate_document_intake_lifecycle=candidate_document_intake_lifecycle,
+        candidate_source_text_lifecycle=candidate_source_text_lifecycle,
+        candidate_extraction_job_lifecycle=candidate_extraction_job_lifecycle,
+        candidate_profile_lifecycle=candidate_profile_lifecycle,
+        candidate_profiling_job_lifecycle=candidate_profiling_job_lifecycle,
         max_processor_deletion_attempts=settings.privacy_max_processor_deletion_attempts,
         processor_retry_base_seconds=settings.privacy_processor_retry_base_seconds,
         telemetry=telemetry,

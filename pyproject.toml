@@ -13,6 +13,7 @@ dependencies = [
   "boto3>=1.40,<2",
   "cryptography>=46,<51",
   "fastapi>=0.115,<1.0",
+  "httpx2>=2,<3",
   "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
   "opentelemetry-sdk>=1.44,<2",
   "psycopg[binary]>=3.2,<4",
@@ -29,11 +30,11 @@ dependencies = [
 ai-interviewer-api = "ai_interviewer.runner:main"
 ai-interviewer-baseline = "ai_interviewer.reliability.cli:main"
 ai-interviewer-migrate = "ai_interviewer.persistence.migrate:main"
+ai-interviewer-profile-quality = "ai_interviewer.profiling.quality_cli:main"
 
 [dependency-groups]
 dev = [
   "boto3-stubs[s3]>=1.40,<2",
-  "httpx2>=2,<3",
   "mypy>=1.15,<3.0",
   "pytest>=9.0.3,<10",
   "pytest-asyncio>=1,<2",
