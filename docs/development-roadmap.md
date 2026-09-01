@@ -181,10 +181,11 @@ Delivery inside 1B is gated further:
        failures; UUID request correlation; server-only secret/file delivery; disabled by
        default; mock-transport tests only, with no credential or external call.
      - **1B-D2.2a - authorized offline quality runner - implemented and locally verified:**
-      separate strict corpus, time-bounded authorization, prediction, and unadjudicated
-      review-draft artifacts; exact corpus/prompt/OpenAI-release binding; explicit external
-      processing confirmation; deterministic request IDs; sequential bounded calls;
-      create-only private output and payload-free summaries. No live call was made.
+       separate strict corpus, time-bounded authorization, prediction, and unadjudicated
+       review-draft artifacts; exact corpus/prompt/OpenAI-release binding; provider-free
+       authorization preflight; explicit external processing confirmation; deterministic
+       request IDs; sequential bounded calls; create-only private output and payload-free
+       summaries. No live call was made.
      - **1B-D2.2b1 - exact review finalization - implemented and locally verified:**
        local-only finalization binds a human-completed review back to the exact corpus and
        prediction run; rejects source, provenance, gold, prediction, coordinate, and order

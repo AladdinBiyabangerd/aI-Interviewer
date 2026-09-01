@@ -487,6 +487,10 @@ Candidate-preparation web application, API, workers, PostgreSQL, object storage,
 - A second `--confirm-external-processing` operator action is mandatory. This is a
   deliberate safety interlock, not a substitute for rights, privacy, transfer, region,
   retention, deletion, budget, or provider-contract approval.
+- A provider-free preflight runs the same corpus digest, current prompt, exact release,
+  and active-window authorization checks without constructing a gateway or reading a
+  credential. Its summary excludes corpus content, paths, approver identity, processor
+  and data-control references, and every secret.
 - The corpus is bounded to 200 fixtures and runs sequentially. Deterministic request IDs
   contain digests/coordinates rather than candidate text. Strict gateway and exact-source
   validation remain active; expected failures become bounded codes.

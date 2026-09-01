@@ -2201,3 +2201,24 @@ edilməyib.
 Tam `./scripts/verify.ps1` nəticəsi: `629 passed, 1 skipped`, `95.63%` combined branch
 coverage, Ruff check/format `226` fayl, strict mypy `89` source fayl, sıfırdan `12`
 PostgreSQL migration, dependency compatibility və vulnerability audit uğurludur.
+
+## 21. Provider-free quality authorization preflight
+
+D2.2b2 üçün real corpus workspace-də olmadığına görə gate saxta data ilə keçilmədi və
+asılı `1C` mərhələsinə başlanmadı. Bunun əvəzinə mövcud D2.2a external-processing sərhədi
+provider-free `preflight` command-i ilə sərtləşdirildi.
+
+`preflight <corpus> <authorization>` strict private artifact-ləri oxuyur və canonical
+corpus digest, current prompt contract, dataset/version, authorization digest, active
+approval window və exact OpenAI release binding-lərini yoxlayır. Gateway qurmur, API key
+oxumur və network call etmir. Uğurlu output yalnız safe model coordinates, timestamp,
+fixture count və digest-lərdir; corpus path-i, approver, processor/data-control reference,
+source text, gold profile və secret-lər çıxışdan kənardır. Invalid input isə əvvəlki kimi
+yalnız bounded error type/status qaytarır.
+
+Real prediction evidence, exhaustive human adjudication/error analysis, threshold pass və
+dörd named approval hələ D2.2b2-də qalır.
+
+Tam `./scripts/verify.ps1` nəticəsi: `632 passed, 1 skipped`, `95.64%` combined branch
+coverage, Ruff check/format `226` fayl, strict mypy `89` source fayl, sıfırdan `12`
+PostgreSQL migration, dependency compatibility və vulnerability audit uğurludur.

@@ -35,6 +35,7 @@ from ai_interviewer.profiling.quality_run import (
     load_profile_quality_prediction_run,
     load_profile_quality_review_draft,
     load_profile_quality_run_authorization,
+    preflight_profile_quality_run,
     prepare_profile_quality_review_draft,
     profile_quality_prediction_run_sha256,
     write_private_quality_artifact,
@@ -73,6 +74,12 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="confirm that this exact approved corpus may be sent to the provider",
     )
+    preflight = subcommands.add_parser(
+        "preflight",
+        help="validate an exact corpus authorization without contacting the provider",
+    )
+    preflight.add_argument("corpus", type=Path)
+    preflight.add_argument("authorization", type=Path)
     review = subcommands.add_parser(
         "prepare-review",
         help="join corpus and predictions into an unadjudicated private draft",
@@ -124,6 +131,16 @@ def main(
         print(profile_quality_prompt_contract_sha256())
         return 0
     try:
+        if args.command == "preflight":
+            corpus = load_profile_quality_corpus(args.corpus)
+            authorization = load_profile_quality_run_authorization(args.authorization)
+            result = preflight_profile_quality_run(
+                corpus,
+                authorization,
+                now=now or datetime.now(UTC),
+            )
+            print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+            return 0
         if args.command == "generate":
             if not args.confirm_external_processing:
                 raise ValueError("external processing confirmation is required")

@@ -132,6 +132,21 @@ class ProfileQualityRunAuthorization(_StrictQualityRunModel):
         return self
 
 
+class ProfileQualityRunPreflight(_StrictQualityRunModel):
+    """Payload-safe proof that the exact corpus authorization is currently active."""
+
+    status: Literal["authorized"] = "authorized"
+    dataset_id: SafeIdentifier
+    dataset_version: SafeIdentifier
+    corpus_sha256: Sha256Digest
+    authorization_sha256: Sha256Digest
+    prompt_contract_sha256: Sha256Digest
+    model_release: ModelReleaseIdentity
+    fixture_count: int = Field(ge=1, le=MAX_QUALITY_PREDICTION_FIXTURES)
+    approved_at: AwareDatetime
+    expires_at: AwareDatetime
+
+
 class ProfileQualityPredictionRecord(_StrictQualityRunModel):
     fixture_id: SafeIdentifier
     document_type: CandidateDocumentType
@@ -241,12 +256,13 @@ def _request_id(
     return uuid5(NAMESPACE_URL, coordinate)
 
 
-def _validate_run_authorization(
+def preflight_profile_quality_run(
     corpus: ProfileQualityCorpus,
     authorization: ProfileQualityRunAuthorization,
-    gateway: ModelGatewayRuntime,
+    *,
     now: datetime,
-) -> None:
+) -> ProfileQualityRunPreflight:
+    """Validate corpus, prompt, digest, and approval window without contacting a provider."""
     current_prompt_digest = profile_quality_prompt_contract_sha256()
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("quality prediction clock must be timezone-aware")
@@ -262,6 +278,26 @@ def _validate_run_authorization(
         raise ValueError("quality prediction authorization corpus mismatch")
     if authorization.approved_at > now or authorization.expires_at <= now:
         raise ValueError("quality prediction authorization is not currently active")
+    return ProfileQualityRunPreflight(
+        dataset_id=corpus.dataset_id,
+        dataset_version=corpus.dataset_version,
+        corpus_sha256=profile_quality_corpus_sha256(corpus),
+        authorization_sha256=profile_quality_run_authorization_sha256(authorization),
+        prompt_contract_sha256=current_prompt_digest,
+        model_release=authorization.model_release,
+        fixture_count=len(corpus.fixtures),
+        approved_at=authorization.approved_at,
+        expires_at=authorization.expires_at,
+    )
+
+
+def _validate_run_authorization(
+    corpus: ProfileQualityCorpus,
+    authorization: ProfileQualityRunAuthorization,
+    gateway: ModelGatewayRuntime,
+    now: datetime,
+) -> None:
+    preflight_profile_quality_run(corpus, authorization, now=now)
     if not gateway.enabled or gateway.model_release != authorization.model_release:
         raise ValueError("quality prediction gateway release mismatch")
 
@@ -495,12 +531,14 @@ __all__ = [
     "ProfileQualityReviewDraft",
     "ProfileQualityReviewDraftFixture",
     "ProfileQualityRunAuthorization",
+    "ProfileQualityRunPreflight",
     "finalize_profile_quality_review",
     "generate_profile_quality_predictions",
     "load_profile_quality_corpus",
     "load_profile_quality_prediction_run",
     "load_profile_quality_review_draft",
     "load_profile_quality_run_authorization",
+    "preflight_profile_quality_run",
     "prepare_profile_quality_review_draft",
     "profile_quality_corpus_sha256",
     "profile_quality_prediction_run_sha256",
