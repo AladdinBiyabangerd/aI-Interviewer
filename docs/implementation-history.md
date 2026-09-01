@@ -2173,3 +2173,31 @@ review/error analysis, threshold success və dörd named approval hələ D2.2b2-
 Tam `./scripts/verify.ps1` nəticəsi: `610 passed, 1 skipped`, `95.57%` combined branch
 coverage, Ruff check/format `220` fayl, strict mypy `87` source fayl, sıfırdan `12`
 PostgreSQL migration, dependency compatibility və vulnerability audit uğurludur.
+
+## 20. Disabled-by-default worker supervision runtime
+
+Mövcud durable extraction və profiling job-ları üçün ayrıca process entrypoint əlavə
+edildi. Extraction worker application composition-a qoşuldu, amma həm extraction, həm
+profiling worker default olaraq disabled qalır. API lifespan background job başlatmır;
+operator və ya orchestrator ayrıca `ai-interviewer-workers` process-ini işə salmalıdır.
+
+Supervisor hər sweep-də bounded batch istifadə edir, enabled worker-ləri müstəqil icra
+edir və bir runtime failure-ın digər queue-nu bloklamasına imkan vermir. Boş queue üçün
+bounded polling, runtime failure üçün ayrıca backoff, cancellation propagation və normal
+database/telemetry cleanup mövcuddur. `--once` bir operator sweep-i edib dayanır.
+
+Extraction success/failure transition zamanı lease itirilərsə worker artıq process-i
+crash etdirmir; nəticə payload-free `fenced/lease_expired` olur və durable winner
+authoritative qalır. Log-larda yalnız bounded status count-ları və exception class adı
+var; candidate content, identifier, path, object key, provider body və exception message
+yoxdur.
+
+[ADR 0028](adr/0028-disabled-by-default-worker-supervision.md) process separation və
+activation boundary-ni sabitləyir. Bu dəyişiklik D2.2b2 quality gate-ni keçmir: real
+rights-cleared corpus, human adjudication/error analysis, threshold success və dörd named
+approval hələ tələb olunur. Credential, schema migration və real provider call əlavə
+edilməyib.
+
+Tam `./scripts/verify.ps1` nəticəsi: `629 passed, 1 skipped`, `95.63%` combined branch
+coverage, Ruff check/format `226` fayl, strict mypy `89` source fayl, sıfırdan `12`
+PostgreSQL migration, dependency compatibility və vulnerability audit uğurludur.

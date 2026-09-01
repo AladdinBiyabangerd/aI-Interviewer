@@ -23,11 +23,13 @@ from ai_interviewer.candidate_inputs import (
     CandidateDocumentIntakeRuntime,
     CandidateDocumentRuntime,
     CandidateExtractionJobRuntime,
+    CandidateExtractionWorkerRuntime,
     CandidateInputRuntime,
     CandidateSourceTextRuntime,
     build_candidate_document_intakes,
     build_candidate_documents,
     build_candidate_extraction_jobs,
+    build_candidate_extraction_worker,
     build_candidate_inputs,
     build_candidate_source_texts,
 )
@@ -81,6 +83,7 @@ def create_app(
     candidate_documents: CandidateDocumentRuntime | None = None,
     candidate_document_intakes: CandidateDocumentIntakeRuntime | None = None,
     candidate_extraction_jobs: CandidateExtractionJobRuntime | None = None,
+    candidate_extraction_worker: CandidateExtractionWorkerRuntime | None = None,
     candidate_source_texts: CandidateSourceTextRuntime | None = None,
     candidate_profiles: CandidateProfileRuntime | None = None,
     candidate_profiling_jobs: CandidateProfilingJobRuntime | None = None,
@@ -137,6 +140,15 @@ def create_app(
     resolved_candidate_source_texts = candidate_source_texts or build_candidate_source_texts(
         resolved_settings,
         resolved_database,
+    )
+    resolved_candidate_extraction_worker = (
+        candidate_extraction_worker
+        or build_candidate_extraction_worker(
+            resolved_settings,
+            resolved_candidate_extraction_jobs,
+            resolved_file_security,
+            resolved_candidate_source_texts,
+        )
     )
     resolved_candidate_profiles = candidate_profiles or build_candidate_profiles(
         resolved_settings,
@@ -218,6 +230,7 @@ def create_app(
     app.state.candidate_documents = resolved_candidate_documents
     app.state.candidate_document_intakes = resolved_candidate_document_intakes
     app.state.candidate_extraction_jobs = resolved_candidate_extraction_jobs
+    app.state.candidate_extraction_worker = resolved_candidate_extraction_worker
     app.state.candidate_source_texts = resolved_candidate_source_texts
     app.state.candidate_profiles = resolved_candidate_profiles
     app.state.candidate_profiling_jobs = resolved_candidate_profiling_jobs

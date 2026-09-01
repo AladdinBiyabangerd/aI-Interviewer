@@ -7,6 +7,7 @@ from uuid6 import uuid7
 
 from ai_interviewer.candidate_inputs import extraction_worker as worker_module
 from ai_interviewer.candidate_inputs.extraction_jobs import (
+    CandidateExtractionJobConflictError,
     CandidateExtractionJobRecord,
     CandidateExtractionJobRuntime,
     ScheduleExtractionResult,
@@ -17,7 +18,10 @@ from ai_interviewer.candidate_inputs.extraction_models import (
 )
 from ai_interviewer.candidate_inputs.extraction_worker import (
     CandidateExtractionWorker,
+    CandidateExtractionWorkerUnavailableError,
+    DisabledCandidateExtractionWorker,
     FileParserSource,
+    build_candidate_extraction_worker,
 )
 from ai_interviewer.candidate_inputs.source_texts import (
     CandidateSourceTextConflictError,
@@ -27,6 +31,7 @@ from ai_interviewer.candidate_inputs.source_texts import (
     ParserExecutionIdentity,
     StoreParserExtractionResult,
 )
+from ai_interviewer.core.config import Settings
 from ai_interviewer.extraction_runtime.isolation import IsolationExecutionError
 from ai_interviewer.file_security.lifecycle import FileStateConflictError
 
@@ -72,6 +77,8 @@ class FakeExtractionJobRuntime(CandidateExtractionJobRuntime):
     jobs: list[CandidateExtractionJobRecord]
     succeeded: list[tuple[UUID, str, UUID, UUID]] = field(default_factory=list)
     failed: list[tuple[UUID, str, UUID, str]] = field(default_factory=list)
+    succeed_error: Exception | None = None
+    fail_error: Exception | None = None
 
     async def schedule_extraction(
         self,
@@ -101,6 +108,8 @@ class FakeExtractionJobRuntime(CandidateExtractionJobRuntime):
         *,
         now: datetime | None = None,
     ) -> CandidateExtractionJobRecord:
+        if self.succeed_error is not None:
+            raise self.succeed_error
         self.succeeded.append((job_id, worker_id, lease_token, source_text_id))
         return self._update(
             job_id,
@@ -120,6 +129,8 @@ class FakeExtractionJobRuntime(CandidateExtractionJobRuntime):
         *,
         now: datetime | None = None,
     ) -> CandidateExtractionJobRecord:
+        if self.fail_error is not None:
+            raise self.fail_error
         self.failed.append((job_id, worker_id, lease_token, error_code))
         retry = error_code in RETRYABLE_EXTRACTION_FAILURES
         return self._update(
@@ -348,3 +359,80 @@ async def test_worker_refuses_a_claimed_job_without_a_lease_token() -> None:
 
     with pytest.raises(RuntimeError, match="lease token"):
         await worker.run_once(limit=1)
+
+
+@pytest.mark.asyncio
+async def test_worker_reports_fenced_success_and_failure_transitions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    success_job = _job_record()
+    success_jobs = FakeExtractionJobRuntime(
+        jobs=[success_job],
+        succeed_error=CandidateExtractionJobConflictError("lease secret must stay hidden"),
+    )
+    files = FakeFileParserSource(content=b"content")
+    source_texts = FakeSourceTextRuntime()
+    monkeypatch.setattr(
+        worker_module,
+        "run_isolated_extraction",
+        lambda adapter, version, content, *, limits: "content",
+    )
+
+    success_outcome = await CandidateExtractionWorker(
+        success_jobs,
+        files,
+        source_texts,
+        worker_id="worker-1",
+    ).run_once()
+
+    failure_job = _job_record()
+    failure_jobs = FakeExtractionJobRuntime(
+        jobs=[failure_job],
+        fail_error=CandidateExtractionJobConflictError("lease secret must stay hidden"),
+    )
+    failure_outcome = await CandidateExtractionWorker(
+        failure_jobs,
+        FakeFileParserSource(error=FileStateConflictError("unavailable")),
+        FakeSourceTextRuntime(),
+        worker_id="worker-1",
+    ).run_once()
+
+    assert success_outcome[0].status == "fenced"
+    assert success_outcome[0].error_code == "lease_expired"
+    assert failure_outcome[0].status == "fenced"
+    assert failure_outcome[0].error_code == "lease_expired"
+
+
+@pytest.mark.asyncio
+async def test_extraction_worker_builder_is_disabled_by_default_and_validates_identity() -> None:
+    settings = Settings(_env_file=None)
+    disabled = build_candidate_extraction_worker(
+        settings,
+        object(),  # type: ignore[arg-type]
+        object(),  # type: ignore[arg-type]
+        object(),  # type: ignore[arg-type]
+    )
+
+    assert isinstance(disabled, DisabledCandidateExtractionWorker)
+    with pytest.raises(CandidateExtractionWorkerUnavailableError):
+        await disabled.run_once()
+
+    enabled_settings = settings.model_copy(
+        update={"extraction_worker_enabled": True, "extraction_worker_id": "parser-worker-1"}
+    )
+    enabled = build_candidate_extraction_worker(
+        enabled_settings,
+        FakeExtractionJobRuntime(jobs=[]),
+        FakeFileParserSource(content=b"content"),
+        FakeSourceTextRuntime(),
+    )
+    assert isinstance(enabled, CandidateExtractionWorker)
+    assert await enabled.run_once() == ()
+
+    with pytest.raises(ValueError, match="1-128"):
+        CandidateExtractionWorker(
+            FakeExtractionJobRuntime(jobs=[]),
+            FakeFileParserSource(content=b"content"),
+            FakeSourceTextRuntime(),
+            worker_id=" ",
+        )

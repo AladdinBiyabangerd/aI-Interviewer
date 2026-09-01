@@ -136,6 +136,36 @@ def test_profiling_worker_requires_secure_model_boundary_and_fits_job_lease() ->
         Settings(**values, profiling_worker_id="unsafe worker")
 
 
+def test_extraction_worker_requires_file_security_and_has_bounded_runtime_settings() -> None:
+    with pytest.raises(ValidationError, match="extraction worker requires file security"):
+        Settings(_env_file=None, extraction_worker_enabled=True)
+
+    enabled = Settings(
+        _env_file=None,
+        privacy_enabled=True,
+        privacy_keyring=_keyring_json(),
+        file_security_enabled=True,
+        object_storage_bucket="candidate-files",
+        object_storage_region="az-primary",
+        object_storage_kms_key_id="candidate-key",
+        malware_scanner_tcp_host="127.0.0.1",
+        extraction_worker_enabled=True,
+        extraction_worker_id="parser-worker-1",
+        worker_batch_size=25,
+        worker_poll_interval_seconds=0.5,
+        worker_error_backoff_seconds=10,
+    )
+
+    assert enabled.extraction_worker_enabled
+    assert enabled.extraction_worker_id == "parser-worker-1"
+    assert enabled.worker_batch_size == 25
+    assert enabled.worker_poll_interval_seconds == 0.5
+    assert enabled.worker_error_backoff_seconds == 10
+
+    with pytest.raises(ValidationError, match="bounded operational identifier"):
+        Settings(_env_file=None, extraction_worker_id="unsafe worker")
+
+
 @pytest.mark.parametrize(
     "endpoint",
     [

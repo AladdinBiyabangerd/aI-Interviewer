@@ -31,6 +31,7 @@ ai-interviewer-api = "ai_interviewer.runner:main"
 ai-interviewer-baseline = "ai_interviewer.reliability.cli:main"
 ai-interviewer-migrate = "ai_interviewer.persistence.migrate:main"
 ai-interviewer-profile-quality = "ai_interviewer.profiling.quality_cli:main"
+ai-interviewer-workers = "ai_interviewer.worker_runner:main"
 
 [dependency-groups]
 dev = [

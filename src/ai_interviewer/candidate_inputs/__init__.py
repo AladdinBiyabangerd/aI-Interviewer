@@ -14,7 +14,11 @@ from ai_interviewer.candidate_inputs.extraction_jobs import (
 )
 from ai_interviewer.candidate_inputs.extraction_worker import (
     CandidateExtractionWorker,
+    CandidateExtractionWorkerRuntime,
+    CandidateExtractionWorkerUnavailableError,
+    DisabledCandidateExtractionWorker,
     WorkerOutcome,
+    build_candidate_extraction_worker,
 )
 from ai_interviewer.candidate_inputs.intakes import (
     CandidateDocumentIntakeRuntime,
@@ -43,10 +47,13 @@ __all__ = [
     "CandidateExtractionJobRuntime",
     "CandidateExtractionJobService",
     "CandidateExtractionWorker",
+    "CandidateExtractionWorkerRuntime",
+    "CandidateExtractionWorkerUnavailableError",
     "CandidateInputRuntime",
     "CandidateInputService",
     "CandidateSourceTextRuntime",
     "CandidateSourceTextService",
+    "DisabledCandidateExtractionWorker",
     "FailClosedCandidateDocumentIntakeService",
     "FailClosedCandidateDocumentService",
     "FailClosedCandidateExtractionJobService",
@@ -56,6 +63,7 @@ __all__ = [
     "build_candidate_document_intakes",
     "build_candidate_documents",
     "build_candidate_extraction_jobs",
+    "build_candidate_extraction_worker",
     "build_candidate_inputs",
     "build_candidate_source_texts",
 ]
