@@ -649,7 +649,7 @@ async def test_privacy_export_and_deletion_cover_intake_saga_metadata(
         "candidate-intake-export",
     )
     assert exported.data is not None
-    assert exported.data["schema_version"] == "phase-1a-c.1"
+    assert exported.data["schema_version"] == "phase-1b-c2"
     intake_export = exported.data["candidate_document_intakes"][0]
     assert intake_export["intake_id"] == str(completed.intake.intake_id)
     assert intake_export["status"] == "completed"

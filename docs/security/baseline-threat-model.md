@@ -267,4 +267,236 @@ Candidate-preparation web application, API, workers, PostgreSQL, object storage,
   model call, or product route is enabled until the separately gated D2.2 sandbox is
   implemented and verified.
 
+## Phase 1A-D2.2 through D4 controls implemented
+
+- Parser execution runs in a separate no-network child process with bounded time,
+  memory, output, file descriptors, and exact versioned PDF/DOCX/text adapters. Only
+  bytes obtained through the released-policy read boundary enter that process.
+- The worker persists through the encrypted source-text service and fenced job lease;
+  parser faults map to a closed error taxonomy and cannot write a partial success.
+- Authenticated owner routes can inspect the full immutable source-text lineage and
+  append an optimistic, idempotent correction without mutating prior revisions.
+- Source-text content and extraction-job metadata participate in privacy export;
+  document-version ownership cascades erase both domains. Real supported-format
+  fixtures, migration/model parity, logical restore, and release-image checks passed.
+
+## Phase 1B-A controls implemented
+
+- Model execution is disabled by default. Enabling requires exact bounded
+  provider/model/version coordinates and an explicitly injected adapter; no concrete
+  provider, endpoint, credential, or outbound call exists yet.
+- Provider requests separate instructions from source text and include the
+  application-owned JSON schema. Provider responses must carry the exact expected model
+  release and are validated again by frozen, strict, extra-forbid application models.
+- Prompt/schema release coordinates plus canonical instruction/schema SHA-256 digests
+  make successful execution identity reproducible. Unknown fields, coercion, malformed
+  JSON, truncation, filtering, excessive output, and release drift fail closed.
+- Input/output/token/attempt/timeout/retry bounds limit abuse and cost exposure.
+  Cancellation propagates. Retryability and terminal errors use closed safe enums.
+- Instructions, candidate source text, JSON schema, and raw output are excluded from
+  object representations. Provider exception text is discarded and the gateway emits
+  no content-bearing log or telemetry signal.
+- Prompt-injection defenses remain incomplete until Phase 1B-B/C adds application-owned
+  profile schemas, exact source-span verification, adversarial fixtures, policy-gated
+  jobs, and a reviewed provider adapter. Product traffic cannot call the gateway yet.
+
+## Phase 1B-B1 controls implemented
+
+- Separate strict CV and JD output contracts reject unknown fields and coercion. Direct
+  identity/contact fields are absent; extracted scope is limited to interview-relevant
+  claims and requirements.
+- Every claim requires bounded exact source evidence. The verifier checks half-open
+  Unicode offsets and quote equality against one exact decrypted source-text version;
+  invalid grounding cannot produce a verified result.
+- Claim IDs, languages, collection sizes, evidence counts/lengths, derived text, skill
+  names, project technologies, and cross-priority JD requirements are bounded or
+  uniqueness-checked. Unsafe Unicode and implicit whitespace cleanup are rejected.
+- Model outputs and verified profiles suppress content in `repr`/`str`. Verification
+  failures expose only closed safe codes without source text, quote, or claim content.
+- These contracts reduce but do not solve prompt injection or semantic hallucination.
+  At the 1B-B1 boundary no prompt/provider existed and no result was persisted. Phase
+  1B-B2.1 now adds exact-source encrypted storage; policy-gated jobs, minimised prompts,
+  adversarial fixtures, and reviewed processor controls remain required before product
+  execution.
+
+## Phase 1B-B2.1 controls implemented
+
+- A profile aggregate is owner-bound to one exact document version, source-text
+  aggregate, and latest immutable source-text revision. Composite foreign keys and
+  database triggers reject cross-owner reassignment, lineage drift, mutable aggregate
+  identity, profile-version updates, and invalid predecessor/version chains.
+- Before writing, the service locks and reauthorizes the active account, draft and
+  unexpired preparation, latest non-archived document version, latest source revision,
+  privacy profile, processing rule, legal basis, and delete-only retention decision.
+  It reopens/decrypts the exact source and repeats application-owned document-type,
+  bounds, and exact-quote evidence validation inside the transaction.
+- Canonical strict profile JSON is encrypted with AES-256-GCM and never stored as
+  plaintext. Metadata-bound AAD and a separate keyed HMAC bind owner/profile/version,
+  source/document lineage, schema/model/prompt identities, instruction/schema digests,
+  evidence counts, privacy/retention snapshots, and key identities. Read/export fails
+  closed on decryption, schema, digest, lineage, or count mismatch.
+- The first immutable revision records exact provider/model/version,
+  prompt/version, schema ID/version, canonical instruction/schema SHA-256, model
+  attempts, and content-free evidence counts. An exact replay is idempotent; a changed
+  output or release identity conflicts and cannot overwrite the stored result.
+- Privacy access/export decrypts only through the narrow owner-scoped profile service
+  under schema `phase-1b-b2.1`. Account, document-version, and source-text cascades erase
+  profile aggregates and versions; the stored retention action is delete-only.
+- Audit/outbox details contain only opaque resource IDs, document type, version, and
+  content-free counts. Profile JSON, source quotes, ciphertext, nonce, digest, and model
+  text are excluded from audit, logs, telemetry, and object representations.
+- No provider adapter, credential, endpoint, outbound model call, profiling worker,
+  public profile route, or correction command was added. Durable fenced jobs and
+  bounded dead-letter state are now supplied by Phase 1B-B2.2.
+
+## Phase 1B-B2.2 controls implemented
+
+- One idempotent job is bound to the exact owner, preparation, document version,
+  source aggregate, immutable source revision, and document type. Scheduling repeats
+  are harmless only when every release and policy snapshot is identical; drift
+  conflicts instead of silently reusing work.
+- Privacy/legal/retention decisions and exact provider/model, prompt, schema,
+  instruction/schema digest, and maximum-output-token coordinates are immutable job
+  snapshots protected by constraints and database triggers.
+- Claims use `SKIP LOCKED`, a five-minute UUID lease token, database time, and fencing
+  on every mutation. Expired claims can be recovered; stale or competing workers cannot
+  record failure or success.
+- Retryable failures use closed safe codes, bounded exponential backoff, and at most
+  five claims. Non-retryable and exhausted work enters explicit `dead_letter` state.
+  Candidate text, prompts, output, quotes, raw provider errors, ciphertext, nonce, and
+  keyed digests are excluded from the job, audit, and outbox payloads.
+- A job can succeed only by referencing an encrypted profile for the same owner,
+  document/source revision and exact model/prompt/schema release. Database transition
+  and result triggers independently enforce terminal state shape and result linkage.
+- Privacy export includes content-free owned profiling-job metadata under schema
+  `phase-1b-b2.2`; account/document/source cascades erase the jobs. No provider adapter,
+  outbound model call, profiling worker, or public route is enabled by this phase.
+
+## Phase 1B-C1 controls implemented
+
+- Separate application-owned CV/JD prompt releases bind exact instructions, strict
+  schemas, maximum output tokens, and canonical SHA-256 identities. Instructions treat
+  the complete document as untrusted data, ignore embedded commands, exclude direct
+  identity/contact fields, and require exact Unicode source spans.
+- Every newly scheduled profiling job requires an immutable approved processor activity.
+  Scheduling verifies active processor/activity status, exact model-provider key,
+  privacy policy, `candidate_document/interview_preparation` purpose, and the owner's
+  origin/storage region. Migration refuses to invent authorization for pre-existing jobs.
+- The job UUID is the exact provider request/idempotency/deletion reference. Immediately
+  before each call, the worker reauthorizes the activity and registers that locator through
+  the privacy lifecycle; PostgreSQL stores only AES-GCM ciphertext and a keyed digest.
+  Processor suspension or policy drift prevents candidate text from reaching the adapter.
+- Worker execution has a distinct disabled-by-default gate and requires model gateway,
+  privacy, file-security, and a gateway retry budget that fits within the five-minute
+  lease. The OpenAI adapter is constructed only for explicit OpenAI coordinates and a
+  server secret; no background loop starts implicitly.
+- Before decryption/provider use, the worker matches the job's model/prompt/schema/digest
+  snapshots to the configured gateway and code-owned prompt. After strict gateway parsing,
+  it repeats exact-source evidence validation and uses only the encrypted profile service.
+- Success is committed with the current UUID lease token. Stale workers return a fenced
+  outcome without mutating state; retries reuse the same processor request reference and
+  idempotent profile lineage. Cancellation propagates without recording a false failure.
+- Safe provider failures map to the existing closed retry/dead-letter taxonomy. Unexpected
+  failures become `internal_failure`; source text, prompts, output, quotes, ciphertext,
+  locator plaintext, and raw exceptions remain absent from operational evidence.
+- Privacy export advances to `phase-1b-c1` because safe profiling-job metadata now includes
+  the immutable processor activity ID. No credential is bundled, and the default
+  configuration still makes no outbound call or starts a continuous supervisor.
+
+## Phase 1B-C2 controls implemented
+
+- Profile/status reads and corrections require bearer authentication plus
+  `preparation:read` or `preparation:write`. Queries bind account, preparation, document
+  version, and exact source-text version; cross-owner resources remain opaque `404`.
+- Owner status responses expose only bounded job state, attempts, safe failure code,
+  retryability, and availability/completion timestamps. Worker identity, lease token,
+  processor activity/locator, release digests, and raw provider detail are excluded.
+- A profile is exposed only when the fenced job is durably `succeeded` and its result ID
+  matches the exact encrypted profile. Active work returns no profile even during the
+  small interval after profile persistence and before the job success transition.
+- Responses use `Cache-Control: no-store`. Completed histories carry a strong aggregate
+  ETag; corrections require a quoted positive `If-Match`, return `412` on stale state,
+  and treat only an identical immediately repeated append as idempotent.
+- Correction payloads pass the strict CV/JD schema, document-type check, current
+  privacy/legal/delete-only retention authorization, latest document/source checks, and
+  exact evidence-span comparison against decrypted retained source text inside the
+  transaction. Invalid or stale content cannot persist.
+- Every correction is a new AES-GCM encrypted, HMAC-bound `user_correction` version with
+  an immutable predecessor. Generated and earlier corrected history is never updated;
+  database triggers continue to reject version mutation and broken chains.
+- Correction audit/outbox contains opaque IDs, bounded schema/origin and evidence counts,
+  with the owner as actor. Profile JSON, quotes, source text, ciphertext, nonce, digest,
+  and request body remain absent from audit, outbox, logs, and telemetry.
+- Privacy export advances to `phase-1b-c2` and includes the complete decrypted,
+  revalidated profile history. Existing account/document/source cascades erase it. The
+  existing schema already reserved and protects correction rows, so no migration was
+  needed. No provider activation or continuous worker supervisor is added.
+
+## Phase 1B-D1 controls implemented
+
+- The quality evaluator is an offline, bounded-file command and does not contact the
+  API, database, provider, or any external service. Invalid input and summaries exclude
+  source text, profile statements, evidence quotes, paths, prompts, and raw output.
+- Every evidence bundle binds exact model coordinates and the canonical digest of both
+  current CV/JD prompt/schema contracts. Prompt drift blocks eligibility.
+- Gold source spans must validate exactly. Predicted span mismatches lower explicit
+  coverage, and the fixed policy requires 100%. Human adjudication exhaustively maps
+  every gold and predicted claim once, avoiding opaque model-based semantic judging.
+- Minimum corpus, AZ/EN x CV/JD, adversarial-risk, and field-support rules prevent a
+  copied-gold or field-sparse seed from claiming release quality. Precision, recall,
+  strict prediction success, owner-review coverage, and correction rate all gate the
+  result.
+- Evaluation cannot approve a release. A separate record binds the full evidence digest
+  and requires unique product, engineering, Azerbaijani, and English reviewer roles.
+- Only explicitly synthetic fixtures may be marked repository-safe. Sensitive or
+  rights-restricted corpora remain outside version control under an approved access,
+  purpose, retention, and deletion boundary. D1 ships no real corpus or provider call.
+
+## Phase 1B-D2.1 controls implemented
+
+- The concrete adapter has one fixed TLS destination: OpenAI `POST /v1/responses`.
+  Redirects, ambient proxy inheritance, configurable base URLs, provider tools, search,
+  files, background execution, and server-side continuation are not enabled.
+- The adapter sends the configured exact model version, `store=false`, and
+  `truncation=disabled`. It returns the response-reported model identity so alias or
+  release drift is rejected by the existing gateway before output can persist.
+- Provider schema normalization removes defaults and recursively requires every object
+  property with `additionalProperties=false`. The application-owned original strict
+  schema, exact source-span verifier, and encrypted persistence boundary remain
+  independent final authorities.
+- The durable job UUID is sent only as `X-Client-Request-Id`. The API key is held as
+  `SecretStr`; hosted environments require an absolute startup secret file. Disabled or
+  non-OpenAI configurations reject OpenAI credentials.
+- HTTP/provider response bodies and exception text are discarded on failures. Status,
+  timeout, network, incomplete, refusal, malformed, oversized, and unexpected-state
+  outcomes map to closed safe codes. Successful raw responses are bounded before parsing.
+- Execution and the worker remain disabled by default. Mock-transport tests make no
+  external request. D2.1 adds no credential, corpus prediction, quality approval,
+  processor contract, country activation, public scheduler, or continuous supervisor.
+- `store=false` reduces API-side response storage but is not treated as a processor,
+  residency, retention, or deletion guarantee. Those remain activity-specific legal and
+  operational gates before any real candidate or rights-cleared corpus data is sent.
+
+## Phase 1B-D2.2a controls implemented
+
+- The offline prediction command accepts only a strict corpus and a separate `approved`
+  authorization bound to its canonical digest, exact dataset/version, current prompt
+  digest, exact OpenAI model release, processor activity, data-control review, approver,
+  and timezone-aware active window. Drift or expiry blocks before the first request.
+- A second `--confirm-external-processing` operator action is mandatory. This is a
+  deliberate safety interlock, not a substitute for rights, privacy, transfer, region,
+  retention, deletion, budget, or provider-contract approval.
+- The corpus is bounded to 200 fixtures and runs sequentially. Deterministic request IDs
+  contain digests/coordinates rather than candidate text. Strict gateway and exact-source
+  validation remain active; expected failures become bounded codes.
+- Corpus, authorization, predictions, review draft, and final evidence are private
+  artifacts outside version control. Output uses exclusive create semantics and is
+  written only after the run completes; stdout and invalid-input errors exclude paths,
+  source/profile content, prompts, keys, and raw provider details.
+- Review preparation verifies exact corpus/run binding, then deliberately emits empty
+  adjudications and `not_reviewed` outcomes. Automation cannot impersonate the human
+  reviewers required by D1.
+- Tests use an in-memory provider. D2.2a made no external call and includes no credential,
+  real corpus, prediction evidence, processor approval, or human quality decision.
+
 This threat model must be updated before each phase gate and whenever a new data type, vendor, trust boundary, or external audience is introduced.

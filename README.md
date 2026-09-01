@@ -4,9 +4,9 @@ Production-oriented implementation of the candidate-preparation platform describ
 
 ## Current scope
 
-Phases 0A, 0B, 0C-A, 0C-B, 0C-C, 0D-A, 0D-B, 0D-C-A, the bounded 0D-C-B1 baseline evidence tooling, Phase 1A-A through 1A-C, Phase 1A-D1, and the internal Phase 1A-D2.1 through 1A-D3 subphases are implemented. The application persists owner-bound preparation context and immutable CV/JD lineage, exposes durable authenticated upload/paste through validation, quarantine, malware scanning, clean release, and idempotent attachment, has encrypted source-text storage plus fenced parser work records, can run the exact approved PDF/DOCX/TXT adapter in a no-network, resource-bounded child process, and lets the owner read and correct the resulting source text through an authenticated, optimistic-concurrency HTTP contract. It does not yet run a continuous worker supervisor or provide interview, evaluation, report, RAG, voice, or video capability. Live staging measurement and the remaining 0D reliability/production gates are deferred until the text flow is feature-stable under [ADR 0010](docs/adr/0010-feature-stable-mvp-before-hosted-reliability-baseline.md); they remain mandatory before production.
+Phases 0A, 0B, 0C-A, 0C-B, 0C-C, 0D-A, 0D-B, 0D-C-A, the bounded 0D-C-B1 baseline evidence tooling, and Phase 1A-A through 1A-D4 are implemented and locally release-verified. Phase 1B is in progress: 1B-A adds the disabled-by-default provider-neutral model gateway, 1B-B1 adds strict evidence-linked CV/JD schemas, 1B-B2 adds encrypted immutable profiles and durable fenced jobs, 1B-C1 adds a policy-gated profiling worker, and 1B-C2 adds authenticated owner profile status/inspection plus immutable correction. Phase 1B-D1 adds an offline, payload-safe labeled quality evaluator with fixed field/slice/span/review thresholds, a separate digest-bound four-role approval contract, and a deliberately non-qualifying synthetic AZ/EN CV/JD seed. Phase 1B-D2.1 adds a concrete, disabled-by-default OpenAI Responses adapter; D2.2a adds an explicit-confirmation offline runner bound to an exact private corpus, approval window, prompt digest, and OpenAI release, plus a deliberately unadjudicated review-draft step. D2.2b1 adds exact, create-only finalization that permits human adjudication/owner outcomes while rejecting corpus, prediction, provenance, release, and fixture-order drift. Generated history is never overwritten: every correction is a new encrypted, evidence-revalidated version protected by strong `If-Match` concurrency and exact-retry idempotency. The worker binds code-owned prompts, an approved immutable processor activity, encrypted processor-usage registration, one provider request ID, independent evidence validation, encrypted persistence, and the live job lease. Source text, extraction/profiling-job metadata, and decrypted owned profile histories participate in account privacy export and owner/document cascades erase them. No API credential or real corpus is bundled, no live OpenAI request was made during verification, and the configuration still disables model execution and the profiling worker. Continuous supervision, real prediction evidence, human adjudication, error analysis, threshold success, named quality approval, interview, evaluation, report, RAG, voice, and video remain pending. Live staging measurement and the remaining 0D reliability/production gates are deferred until the text flow is feature-stable under [ADR 0010](docs/adr/0010-feature-stable-mvp-before-hosted-reliability-baseline.md); they remain mandatory before production.
 
-See [the development roadmap](docs/development-roadmap.md), [Phase 1A-D3 completion record](docs/status/phase-1a-d3-owner-inspection-and-correction.md), [owner correction ADR](docs/adr/0016-owner-source-text-inspection-and-correction.md), [isolated parser worker ADR](docs/adr/0015-isolated-parser-worker.md), [source-text ADR](docs/adr/0013-encrypted-immutable-candidate-source-text.md), [sequencing ADR](docs/adr/0010-feature-stable-mvp-before-hosted-reliability-baseline.md), [SLI measurement contract](docs/reliability/sli-measurement-contract.md), and [baseline evidence format](docs/reliability/baseline-evidence-format.md).
+See [the development roadmap](docs/development-roadmap.md), [review-finalization record](docs/status/phase-1b-d2-2b1-review-finalization.md), [review-finalization ADR](docs/adr/0027-exact-human-review-finalization.md), [authorized quality-runner record](docs/status/phase-1b-d2-2a-authorized-quality-runner.md), [authorized quality-runner ADR](docs/adr/0026-authorized-offline-quality-prediction-run.md), [OpenAI adapter record](docs/status/phase-1b-d2-1-openai-responses-adapter.md), [OpenAI adapter ADR](docs/adr/0025-openai-responses-provider-adapter.md), [profile quality contract](docs/quality/profile-quality-gate.md), [Phase 1B-D1 completion record](docs/status/phase-1b-d1-profile-quality-contract.md), [profile quality ADR](docs/adr/0024-deterministic-profile-quality-gate.md), [Phase 1B-C2 completion record](docs/status/phase-1b-c2-owner-profile-inspection-and-correction.md), [owner profile correction ADR](docs/adr/0023-owner-profile-inspection-and-correction.md), [Phase 1B-C1 completion record](docs/status/phase-1b-c1-policy-gated-profiling-worker.md), [profiling execution ADR](docs/adr/0022-policy-gated-profiling-execution.md), [Phase 1B-B2.2 completion record](docs/status/phase-1b-b2-2-durable-profiling-jobs.md), [profiling-job ADR](docs/adr/0021-durable-fenced-profiling-jobs.md), [Phase 1B-B2.1 completion record](docs/status/phase-1b-b2-1-encrypted-profile-persistence.md), [profile persistence ADR](docs/adr/0020-encrypted-candidate-profile-persistence.md), [Phase 1B-B1 completion record](docs/status/phase-1b-b1-evidence-profile-contracts.md), [evidence profile ADR](docs/adr/0019-evidence-linked-profile-contracts.md), [Phase 1B-A completion record](docs/status/phase-1b-a-model-gateway.md), [model gateway ADR](docs/adr/0018-provider-neutral-model-gateway.md), [Phase 1A-D4 completion record](docs/status/phase-1a-d4-lifecycle-and-phase-gate.md), [lifecycle and phase gate ADR](docs/adr/0017-phase-1a-lifecycle-and-phase-gate.md), [owner correction ADR](docs/adr/0016-owner-source-text-inspection-and-correction.md), [isolated parser worker ADR](docs/adr/0015-isolated-parser-worker.md), [source-text ADR](docs/adr/0013-encrypted-immutable-candidate-source-text.md), [sequencing ADR](docs/adr/0010-feature-stable-mvp-before-hosted-reliability-baseline.md), [SLI measurement contract](docs/reliability/sli-measurement-contract.md), and [baseline evidence format](docs/reliability/baseline-evidence-format.md).
 
 For a single detailed account of everything implemented from the beginning, see the
 [implementation history](docs/implementation-history.md).
@@ -16,6 +16,22 @@ For a single detailed account of everything implemented from the beginning, see 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
 - Docker, for PostgreSQL integration and container verification
+- Node.js 22.13 or newer, for the interactive frontend demo
+
+## Frontend MVP demo
+
+An English, responsive boss-demo is available in [`frontend`](frontend/README.md).
+It covers setup, simulated AI analysis, a three-question interview, and a final
+scorecard with a seven-day plan. The current UI uses synthetic sample data and
+does not send a real CV to OpenAI.
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
 
 ## Local verification
 
@@ -69,9 +85,51 @@ Protected candidate-document intake endpoints:
 - `POST /api/v1/preparations/{id}/documents/{cv|job_description}/paste` (`preparation:write`, `Idempotency-Key`, bounded UTF-8 `text/plain` body)
 - `GET /api/v1/preparations/{id}/document-intakes/{intake_id}` (`preparation:read`, durable owner-scoped status)
 
-Authentication, privacy, and file security are deliberately disabled in the local example until an OIDC issuer, approved policy records, a mounted privacy keyring, a reviewed SSE-KMS bucket, and a local malware-scanner socket are configured. Staging and production both refuse to start with any boundary disabled or without release identity. See [.env.example](.env.example), [ADR 0004](docs/adr/0004-oidc-resource-server-and-local-identity.md), [ADR 0005](docs/adr/0005-jurisdiction-aware-privacy-lifecycle.md), and [ADR 0006](docs/adr/0006-file-secret-security.md). The API never accepts an ID token in place of an access token.
+Protected extracted-text and profile endpoints:
 
-Phase 0C-C owns file bytes and their quarantine/release/deletion lifecycle. Phase 1A-A adds preparation context, Phase 1A-B adds immutable document-version metadata, Phase 1A-C durably coordinates authenticated raw upload/paste, Phase 1A-D1 adds internal encrypted immutable source-text lineage, Phase 1A-D2.1 adds the durable fenced extraction-job contract, Phase 1A-D2.2 adds the isolated, no-network PDF/DOCX/TXT parser worker, and Phase 1A-D3 adds the authenticated owner read/correction HTTP contract. Complete lifecycle gating remains D4.
+- `GET`/`PUT /api/v1/preparations/{id}/document-versions/{document_version_id}/source-text` (`preparation:read`/`preparation:write`; correction requires strong `If-Match`)
+- `GET /api/v1/preparations/{id}/document-versions/{document_version_id}/profiles/{source_text_version_id}` (`preparation:read`; safe job status plus completed encrypted profile history)
+- `PUT /api/v1/preparations/{id}/document-versions/{document_version_id}/profiles/{source_text_version_id}` (`preparation:write`; strict evidence-linked correction plus strong `If-Match`)
+
+Authentication, privacy, file security, model execution, and the profiling worker are deliberately disabled in the local example. Staging and production refuse to start with mandatory identity/privacy/file boundaries disabled or without release identity. Model execution additionally fails closed without exact provider/model/version coordinates; `provider=openai` requires a server-side API secret and any other provider still requires an explicitly injected adapter. Hosted OpenAI credentials must come from an absolute secret file. See [.env.example](.env.example), [ADR 0004](docs/adr/0004-oidc-resource-server-and-local-identity.md), [ADR 0005](docs/adr/0005-jurisdiction-aware-privacy-lifecycle.md), [ADR 0006](docs/adr/0006-file-secret-security.md), [ADR 0018](docs/adr/0018-provider-neutral-model-gateway.md), and [ADR 0025](docs/adr/0025-openai-responses-provider-adapter.md). The API never accepts an ID token in place of an access token.
+
+Phase 0C-C owns file bytes and their quarantine/release/deletion lifecycle. Phase 1A-A adds preparation context, Phase 1A-B adds immutable document-version metadata, Phase 1A-C durably coordinates authenticated raw upload/paste, Phase 1A-D1 adds internal encrypted immutable source-text lineage, Phase 1A-D2.1 adds the durable fenced extraction-job contract, Phase 1A-D2.2 adds the isolated, no-network PDF/DOCX/TXT parser worker, Phase 1A-D3 adds the authenticated owner read/correction HTTP contract, and Phase 1A-D4 closes the phase by wiring source-text and extraction-job data into privacy export and proving the full pipeline against real PDF/DOCX/text fixtures. Phase 1B-A adds the provider-neutral model execution boundary, 1B-B1 adds strict in-memory evidence contracts, 1B-B2 adds encrypted exact-source profiles and fenced jobs, 1B-C1 adds disabled-by-default policy-gated worker execution, 1B-C2 exposes owner-only status/inspection/correction without mutating generated history, 1B-D1 freezes the deterministic labeled quality and separate approval contract, 1B-D2.1 adds the reviewed OpenAI Responses transport, D2.2a adds its private authorized offline prediction/review-artifact workflow, and D2.2b1 adds exact review finalization. The next gate is D2.2b2: an approved rights-cleared full-corpus run, exhaustive human adjudication, error analysis, threshold success, and named approval. Product activation and continuous supervision remain separate reviewed decisions.
+
+## OpenAI provider (disabled by default)
+
+The concrete adapter calls only `https://api.openai.com/v1/responses`, requests strict JSON Schema output, sends `store=false`, disables automatic input truncation, and propagates the durable job UUID as `X-Client-Request-Id`. It does not enable tools, web search, file search, or background responses. The application still validates the returned JSON and exact reported model release.
+
+Never paste an API key into source code, documentation, commits, tickets, or chat. For development, place a newly created key only in the ignored local `.env` as `AI_INTERVIEWER_OPENAI_API_KEY`, or point `AI_INTERVIEWER_OPENAI_API_KEY_FILE` to a protected secret file containing only the key. Hosted environments accept only the absolute secret-file form. A key exposed anywhere must be revoked before use.
+
+Enabling the gateway alone does not send data: the profiling worker remains a separate gate and every real job still requires an approved processor activity. No live request is part of the test suite.
+
+## Profile quality evaluation
+
+The quality CLI exposes strict private-artifact schemas, an explicitly authorized
+prediction action, a deliberately unadjudicated human-review draft, payload-safe metric
+summaries, and a separate approval gate:
+
+```powershell
+uv run ai-interviewer-profile-quality prompt-digest
+uv run ai-interviewer-profile-quality schema corpus
+uv run ai-interviewer-profile-quality schema authorization
+uv run ai-interviewer-profile-quality schema predictions
+uv run ai-interviewer-profile-quality schema review-draft
+uv run ai-interviewer-profile-quality schema evidence
+uv run ai-interviewer-profile-quality schema approval
+uv run ai-interviewer-profile-quality generate <corpus.json> <authorization.json> <predictions.json> --confirm-external-processing
+uv run ai-interviewer-profile-quality prepare-review <corpus.json> <predictions.json> <review-draft.json>
+uv run ai-interviewer-profile-quality finalize-review <corpus.json> <predictions.json> <completed-review.json> <quality-evidence.json>
+uv run ai-interviewer-profile-quality evaluate <quality-evidence.json>
+uv run ai-interviewer-profile-quality gate <quality-evidence.json> <approval.json>
+```
+
+`generate` can send every private fixture to OpenAI and therefore must be used only with
+a newly rotated server key, exact digest-bound authorization, and approved corpus/data
+controls. It creates but never overwrites a private output file. `evaluate`, `gate`, and
+`prepare-review`/`finalize-review` make no provider call. The checked-in synthetic seed intentionally
+returns `blocked`: it verifies the tool but is not large or complete enough to validate a real model release. See the
+[quality contract](docs/quality/profile-quality-gate.md).
 
 Interactive API documentation is disabled by default and can be explicitly enabled in a development environment.
 

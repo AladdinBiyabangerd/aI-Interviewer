@@ -23,6 +23,8 @@ from ai_interviewer.persistence import models as persistence_models  # noqa: F40
 from ai_interviewer.persistence.base import PersistenceBase
 from ai_interviewer.persistence.database import database_connect_args
 from ai_interviewer.privacy import models as privacy_models  # noqa: F401
+from ai_interviewer.profiling import job_models as profiling_job_models  # noqa: F401
+from ai_interviewer.profiling import models as profiling_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

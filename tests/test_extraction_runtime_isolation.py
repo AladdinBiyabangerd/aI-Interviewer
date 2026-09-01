@@ -110,6 +110,7 @@ def test_run_isolated_extraction_reports_crash_without_payload() -> None:
             TEXT_ADAPTER,
             TEXT_ADAPTER_VERSION,
             b"content",
+            limits=_GENEROUS_TEST_LIMITS,
             _entrypoint=_crash_immediately,
         )
     assert exc_info.value.code == "parser_crashed"
@@ -122,6 +123,7 @@ def test_run_isolated_extraction_reports_resource_exceeded_when_signal_killed() 
             TEXT_ADAPTER,
             TEXT_ADAPTER_VERSION,
             b"content",
+            limits=_GENEROUS_TEST_LIMITS,
             _entrypoint=_die_by_signal,
         )
     assert exc_info.value.code == "resource_exceeded"

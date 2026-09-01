@@ -2,7 +2,7 @@
 
 ## 1. Sənəd haqqında
 
-Bu sənəd AI Interviewer Platform layihəsində başlanğıcdan 30 avqust 2026-cı ilədək
+Bu sənəd AI Interviewer Platform layihəsində başlanğıcdan 1 sentyabr 2026-cı ilədək
 faktiki görülmüş işi vahid yerdə təsvir edir. Məqsəd kod bazasının hansı ardıcıllıqla
 qurulduğunu, hər mərhələnin niyə lazım olduğunu, hansı asılılıqlara söykəndiyini,
 nələrin yoxlandığını və nələrin hələ edilmədiyini aydın göstərməkdir.
@@ -10,7 +10,8 @@ nələrin yoxlandığını və nələrin hələ edilmədiyini aydın göstərmə
 Bu, gələcək imkanları hazır kimi göstərən marketinq sənədi deyil. Buradakı
 `tamamlanıb` statusu yalnız həmin mərhələnin əvvəlcədən məhdudlaşdırılmış texniki
 sərhədinə aiddir. Platforma hələ ictimai production buraxılışına hazır deyil və hələ
-namizəd CV-sini parse edən, müsahibə aparan və AI hesabatı yaradan tam məhsul deyil.
+provider-backed CV/JD profiling işlədən, müsahibə aparan və AI hesabatı yaradan tam
+məhsul deyil.
 
 İlkin texniki plan PDF-i tələblər mənbəyi kimi tam oxunub və məhsul məntiqi ondan
 çıxarılıb. PDF-dəki mətn istifadəçi tapşırığından ayrıca qiymətləndirilib; sənədin
@@ -47,34 +48,43 @@ Hazırda aşağıdakı hissələr tamamlanıb:
 | 1A-D2.1 | Tamamlanıb | Durable extraction-job scheduling, lease fencing, bounded retry və safe failure taxonomy |
 | 1A-D2.2 | Tamamlanıb | No-network, resource-bounded isolated PDF/DOCX/TXT parser worker |
 | 1A-D3 | Tamamlanıb | Owner-scoped source-text read/correction HTTP contract, optimistic idempotent append |
+| 1A-D4 | Tamamlanıb | Privacy export inteqrasiyası (source-text/job), supported-input fixture pass — Phase 1A bağlanır |
+| 1B-A | Tamamlanıb | Disabled-by-default provider-neutral model gateway və exact release identity |
+| 1B-B1 | Tamamlanıb | Strict CV/JD scheması və exact source-span evidence verification |
+| 1B-B2.1 | Tamamlanıb | Encrypted immutable exact-source profile lineage və privacy lifecycle integration |
+| 1B-B2.2 | Tamamlanıb | Durable exact-source profiling jobs, UUID lease fencing, bounded retry və dead-letter state |
+| 1B-C1 | Tamamlanıb | Code-owned prompt, immutable processor authorization və fenced profiling worker execution |
+| 1B-C2 | Tamamlanıb | Owner-scoped safe profile status/inspection və encrypted immutable correction append |
 | 0D-C-B2 | Pre-production-a təxirə salınıb | Real backend seçimi, 28 günlük canlı toplama və adlı təsdiqlər |
 | 0D-C-C və sonrası | Pre-production-a təxirə salınıb | Alertlər, incident məşqləri, traffic protection və production gate |
 
-Son tam local verification snapshot-ı (D3, 2026-08-30):
+Son tam local verification snapshot-ı (1B-C2, 2026-09-01):
 
-- Python 3.12 altında `not integration` filtri ilə `331` test keçib, `1`-i (POSIX-only
-  signal-kill ssenarisi) Windows-da skip olunub; `0` uğursuz test.
-- Strict mypy `platform = "linux"` hədəfi ilə `70` source faylı üçün keçir.
-- Ruff lint və format yoxlamaları keçib.
-- `not integration` filtri altında ümumi coverage `71.53%`-dir; bu, layihənin əvvəldən
-  sabit qaydasına uyğundur — `95%` minimum yalnız real PostgreSQL-ə qarşı tam suite
-  işlədikdə ölçülür. Docker Desktop bu handoff zamanı əlçatan olmadığı üçün real
-  PostgreSQL integration suite-i (D2.2-in 2 testi üstünə D3-ün yeni correction
-  testləri daxil olmaqla) yenə işlədilməyib; D2.1 və D2.2 eyni məhdudiyyəti qeyd
-  etmişdi.
-- Yeni `pypdf` və `python-docx` runtime asılılıqları D2.2-də əlavə edildi; D3 heç bir
-  yeni asılılıq gətirmir.
-- Alembic schema revision dəyişməyib (`20260828_0009`); D2.2 və D3 heç bir yeni cədvəl
-  və ya sütun əlavə etmir.
-- D3 zamanı `core/reliability.py`-də yeni source-text route-u reviewed SLI product-route
-  populyasiyasına əlavə edildi; mövcud route-drift regression testi bunu artıq qoruyur.
+- Python 3.12 altında real PostgreSQL integration testləri daxil `538` test keçib,
+  platform-specific `1` test skip olunub və branch-aware coverage `95.15%` olub.
+- Strict mypy `platform = "linux"` hədəfi ilə `83` source faylı üçün keçir; Ruff lint və
+  format yoxlamaları da keçib.
+- Empty-database migration, downgrade/upgrade round trip, Alembic model parity,
+  dependency compatibility və Python vulnerability audit keçib.
+- Local database `20260901_0012` revision-una forward-migrate edilib. Logical
+  backup/restore rehearsal mandatory processor-activity FK-si, profiling-job
+  cədvəl/index/constraint-ləri, `4` profiling-job trigger-i və `4` profile trigger-i daxil
+  olmaqla keçib; müvəqqəti recovery database və dump təmizlənib.
+- Workspace-dən yenidən qurulan release image exact migration head, numeric non-root
+  user, migration job, read-only/capability sərhədləri və embedded baseline schema
+  yoxlamalarından keçib. Əvvəlki C1 build-lərindən qalan workspace-xarici materialized
+  context-lər təhlükəsizlik siyasətinin cleanup məhdudiyyəti səbəbindən lokal saxlanır.
+- Privacy export bundle schema version-u `"phase-1b-c2"`-dir; owned generated/corrected
+  encrypted profile revision-larını narrow service vasitəsilə decrypt/revalidate edir və
+  approved processor activity ID-si daxil content-free profiling-job metadata-sını qaytarır.
 
 Repository GitHub-a `b2d4ed3` (`Complete Phase 1A-C authenticated document intake`)
-commit-i ilə push edilib. Phase 1A-D1, 1A-D2.1, 1A-D2.2 və 1A-D3 dəyişiklikləri həmin
-commit-dən sonrakı lokal, ayrıca review/commit vahidləridir və istifadəçinin
-göstərişinə uyğun GitHub-a push edilməyib. Lokal rehearsal hələ production release
-deyil; imzalanmış promotion, retained CI evidence və approval gate-i production-dan
-əvvəl məcburidir.
+commit-i ilə push edilib. Phase 1A-D1, 1A-D2.1, 1A-D2.2, 1A-D3 və 1A-D4 dəyişiklikləri
+həmin commit-dən sonrakı lokal, ayrıca review/commit vahidləridir və istifadəçinin
+göstərişinə uyğun GitHub-a push edilməyib (1A-D1 və 1A-D2.2-nin GitHub-a push
+edilməsi istisna olmaqla — bax bölmə 5.14-5.15). Lokal rehearsal hələ production
+release deyil; imzalanmış promotion, retained CI evidence və approval gate-i
+production-dan əvvəl məcburidir.
 
 ## 3. Məhsulun başa düşülməsi və dəyişməz guardrail-lər
 
@@ -1438,6 +1448,223 @@ və [Phase 1A-D3 completion record](status/phase-1a-d3-owner-inspection-and-corr
 
 Stop here until the next explicit continuation request.
 
+## 5.17 Phase 1A-D4 - lifecycle and phase gate
+
+This follow-up supersedes the earlier D4 handoff snapshot. Docker-backed verification is
+complete: `./scripts/verify.ps1` passed with `407` tests, one platform-specific skip,
+and `95.02%` branch-aware coverage. Ruff, strict mypy, migration upgrade/round-trip and
+model parity, dependency compatibility, and the Python vulnerability audit passed.
+
+The local database was forward-migrated to `20260828_0009`. Logical backup/recovery
+rehearsal passed with matching row counts and audit/document/source-text/extraction-job
+trigger counts of `2/1/3/2`; it cleaned up the temporary recovery database and dump.
+The release image also passed its non-root, embedded-migration, and baseline-schema
+checks. Phase 1A is therefore locally release-verified. At that gate snapshot, Phase 1B
+was next and still required a model-gateway contract.
+
+## 5.18 Phase 1B-A - provider-neutral model gateway
+
+The first Phase 1B dependency is implemented without selecting or contacting a model
+vendor. A new `model_gateway` package defines exact model and prompt/schema release
+identities, a provider protocol, strict structured-output models, payload-safe request
+and response envelopes, and a disabled fail-closed runtime. Application composition
+exposes the gateway but requires an explicit provider adapter when execution is enabled.
+
+The gateway sends an application-owned JSON schema and validates the returned JSON
+again with frozen, strict, extra-forbid Pydantic models. It rejects model-release drift,
+filtering, truncation, excessive output, malformed JSON, type coercion, and unknown
+fields. Transient failures use bounded per-attempt timeouts and exponential retry;
+terminal failures expose only a closed safe code. Successful results carry exact
+model/prompt coordinates plus canonical instruction and schema SHA-256 identities.
+
+No provider SDK, endpoint, API key, outbound model call, CV/JD profile schema, durable
+profiling job, derived-data table, or product route was added. Phase 1B-B adds exact
+source-span profile contracts and owner/privacy/source-bound durable persistence before
+any external adapter can receive candidate text.
+
+## 5.19 Phase 1B-B1 - evidence-linked profile contracts
+
+Application-owned `CvProfileOutput` and `JobDescriptionProfileOutput` contracts now
+define the only structured shapes allowed across the model gateway. CV claims cover
+skills, projects, responsibilities, career claims, and seniority hints; JD claims split
+must-have and nice-to-have requirements and also cover responsibilities and seniority.
+Direct identity/contact fields are absent.
+
+Every item requires a unique bounded claim ID, a strict derived statement, an
+explicit/inferred marker, and one to five exact `[start,end)` Unicode source spans with
+the cited substring. The separate verifier checks the profile document type, source
+bounds, and exact quote equality before returning a payload-safe verified result.
+Collections, Unicode, duplicate evidence/skills/requirements, and AZ/EN language shape
+are bounded and fail closed. Schema IDs begin at version `1.0.0`.
+
+This phase makes no model call and adds no table or migration. Encrypted immutable
+profile persistence, fenced jobs, dead-letter handling, privacy lifecycle integration,
+and the reviewed provider worker remain Phase 1B-B2/C.
+
+Repository-wide verification passed with `470` tests, one platform-specific skip, and
+`95.35%` branch-aware coverage. Ruff, strict mypy for `76` source files, migration/model
+parity, dependency compatibility, and the vulnerability audit also passed; schema
+revision `20260828_0009` is unchanged.
+
+## 5.20 Phase 1B-B2.1 - encrypted immutable profile persistence
+
+`candidate_profiles` exact latest corrected-source revision üçün stable owner-bound
+aggregate, `candidate_profile_versions` isə append-only encrypted revision lineage-i
+yaradır. Aggregate exact document/source identity-si ilə yanaşı privacy policy,
+jurisdiction, legal basis, delete-only retention rule və deadline snapshot-larını
+saxlayır. İlk `model_generation` revision-u exact model/provider/version,
+prompt/version, schema ID/version, instruction/schema SHA-256, attempt və content-free
+evidence saylarını qeyd edir.
+
+Strict canonical profile JSON PostgreSQL-də yalnız AES-256-GCM ciphertext kimi
+saxlanır. Metadata-bound AAD bütün owner/profile/version, source/document,
+model/prompt/schema, privacy/retention, count, digest və key identity field-lərini
+bağlayır; ayrıca context-bound HMAC substitution-u aşkarlayır. Read/export zamanı
+decryption, schema, digest və evidence count-ları yenidən yoxlanır və uyğunsuzluq fail
+closed edir.
+
+Persistence transaction-ı active account, draft/unexpired preparation, latest document
+version, latest source revision və processing rule-u lock/re-authorize edir, exact
+source revision-u decrypt edir və B1 exact span verifier-ini yenidən işlədir. Eyni exact
+result retry-si idempotent-dir; dəyişən profile və ya release identity-si immutable
+history-ni overwrite etmək əvəzinə conflict verir. Composite FK-lər, constraints və
+dörd DB trigger-i identity/snapshot reassignment, version update və yanlış chain-i
+application-dan asılı olmayaraq rədd edir.
+
+Privacy export schema-sı `phase-1b-b2.1`-ə keçib və owned profile-ları narrow service
+vasitəsilə decrypt edir; account/document/source cascade-ləri aggregate və revision-ları
+silir. Provider adapter, outbound call, profiling job, public profile route və correction
+command əlavə edilməyib.
+
+Repository-wide verification `484` passed, bir platform-specific skip və `95.09%`
+branch-aware coverage ilə tamamlanıb. Ruff, strict mypy (`78` source faylı), migration
+round-trip/model parity, dependency və vulnerability gate-ləri keçib. Schema head
+`20260831_0010`-dur; logical restore rehearsal və release-image verification də profile
+cədvəl/constraint/trigger-ləri daxil olmaqla uğurla tamamlanıb.
+
+## 5.21 Phase 1B-B2.2 - durable fenced profiling jobs
+
+`candidate_profiling_jobs` hər exact immutable source revision üçün bir owner-bound,
+idempotent execution stream yaradır. Schedule transaction-ı active owner, draft/unexpired
+preparation, latest document/source lineage və privacy processing qərarını yenidən
+yoxlayır; owner/preparation/document/source/revision identity-si, document type, privacy,
+legal basis, delete-only retention, exact provider/model, prompt, schema,
+instruction/schema digest-ləri və maximum output token limitini immutable snapshot kimi
+saxlayır. Eyni exact request retry-si eyni job-u qaytarır, hər hansı snapshot drift-i
+conflict verir.
+
+Worker coordination `FOR UPDATE SKIP LOCKED`, database time və fresh UUID lease token-i
+ilə işləyir. Beş dəqiqəlik claim bitəndə job recover oluna bilir, amma stale və competing
+worker heç bir state dəyişikliyi edə bilmir. Maximum beş attempt, 60 saniyədən başlayıb
+3600 saniyədə cap olunan exponential backoff, closed retryable failure taxonomy və
+explicit `dead_letter` terminal state crash/retry sərhədini bağlayır.
+
+`succeeded` yalnız eyni owner, document/source revision və exact model/prompt/schema
+release-i üçün artıq encrypted persistence service-dən keçmiş profile-a bağlana bilər.
+Dörd DB trigger-i insert snapshot-larını, immutable field-ləri, transition-ları və
+successful result linkage-i application kodundan asılı olmayaraq yoxlayır. Audit/outbox
+yalnız opaque ID, status/code, attempt və document type saxlayır; candidate text, prompt,
+model output, quote, profile JSON/ciphertext, nonce, digest və raw provider error heç bir
+operational payload-a düşmür.
+
+Privacy export schema-sı `phase-1b-b2.2`-yə keçib və content-free owned profiling-job
+metadata-sını qaytarır; account/preparation/document/source cascade-ləri job-ları silir.
+Provider adapter, outbound call, profiling worker, public profile route və correction
+command əlavə edilməyib.
+
+Repository-wide verification `500` passed, bir platform-specific skip və `95.09%`
+branch-aware coverage ilə tamamlanıb. Ruff, strict mypy (`80` source faylı), migration
+round-trip/model parity, dependency və vulnerability gate-ləri keçib. Schema head
+`20260901_0011`-dir; logical restore rehearsal bütün dörd profiling-job trigger-i ilə,
+release-image verification isə exact embedded head ilə uğurla tamamlanıb.
+
+## 5.22 Phase 1B-C1 - policy-gated profiling worker
+
+CV və job-description üçün ayrıca code-owned prompt release-ləri yaradılıb. Hər prompt
+exact ID/version, schema ID/version, canonical instruction/schema SHA-256 və fixed output
+token limitinə bağlıdır; source document bütövlükdə untrusted data sayılır, içindəki
+command/role/tool tələbləri rədd edilir, direct identity/contact output qadağandır və hər
+claim exact Unicode source span tələb edir.
+
+Real xarici çağırışdan əvvəl çatışmayan processor gate-i schema-ya əlavə olunub. Hər yeni
+`candidate_profiling_jobs` row-u non-null `processor_activity_id` snapshot-ı saxlayır.
+Schedule active processor/activity status-u, processor key ilə model provider uyğunluğunu,
+privacy policy-ni, `candidate_document/interview_preparation` purpose/category-ni və
+owner storage/origin region-unu yoxlayır. `20260901_0012` migration-u mövcud job-lara
+icazə uydurmur, ambiguous row varsa fail edir; FK restrictive, snapshot trigger-i isə
+activity ID-ni immutable saxlayır.
+
+Job UUID həm də provider request/idempotency/deletion reference-dir və model gateway-dən
+adapter-ə ötürülür. Worker source text-i provider-ə verməzdən dərhal əvvəl həmin processor
+activity-ni privacy lifecycle ilə yenidən authorise edir və job UUID locator-unu keyed
+digest + AES-256-GCM ciphertext kimi `processor_usages`-a idempotent qeyd edir. Suspended
+processor və ya policy drift provider çağırışından əvvəl `policy_unavailable` dead-letter
+verir.
+
+`CandidateProfilingWorker` job-u claim edir, code-owned prompt və configured model release-i
+immutable snapshot-la müqayisə edir, yalnız exact latest source revision-u decrypt edir,
+strict gateway-i çağırır, exact-evidence verifier-i yenidən işlədir, nəticəni encrypted
+profile service-dən keçirir və yalnız eyni live UUID lease token ilə success yazır. Stale
+lease state-i dəyişmir; retry eyni provider request locator və idempotent profile lineage-i
+istifadə edir. Safe gateway code-ları mövcud retry taxonomy-yə map olunur, unexpected
+error `internal_failure` olur, cancellation false failure yazmadan propagate edilir.
+
+Execution ayrıca `AI_INTERVIEWER_PROFILING_WORKER_ENABLED=false` gate-i ilə bağlıdır.
+Enable etmək model gateway, privacy və file-security sərhədlərini, explicit injected
+adapter-i və beş dəqiqəlik job lease daxilində maksimum 240 saniyəlik gateway retry budget-i
+tələb edir. Concrete provider SDK/credential/endpoint, automatic supervisor, public profile
+route və correction command əlavə edilməyib.
+
+Repository-wide verification `524` passed, bir platform-specific skip və `95.09%`
+branch-aware coverage ilə tamamlanıb. Ruff, strict mypy (`82` source faylı), migration
+round-trip/model parity, dependency və vulnerability gate-ləri keçib. Schema head
+`20260901_0012`-dir; logical restore rehearsal processor FK-si ilə, release-image
+verification isə exact embedded head və numeric non-root runtime ilə uğurla tamamlanıb.
+
+## 5.23 Phase 1B-C2 - owner profile inspection and immutable correction
+
+Exact preparation/document/source revision üçün authenticated profil resursu əlavə edilib:
+`GET` safe profiling-job status-u və yalnız fenced `succeeded` nəticədən sonra decrypted
+immutable profil tarixçəsini qaytarır; `PUT` isə owner correction append edir. Read
+`preparation:read`, write `preparation:write` tələb edir və hər lookup account,
+preparation, document version və source-text version-u birlikdə yoxlayır. Cross-owner və
+olmayan resurslar eyni opaque `404` davranışını verir.
+
+Status response worker ID, lease token, processor activity/locator, digest və raw provider
+detail göstərmir. Pending/processing/retry state-lərində profil expose edilmir və
+`Retry-After` qaytarılır; completed history `Cache-Control: no-store` və aggregate
+version-dan strong ETag alır. Beləliklə profile ciphertext yazılıb job success hələ
+fence-lənməmiş qısa interval user-visible final nəticə sayılmır.
+
+Correction strong quoted `If-Match` tələb edir. Command strict CV/JD schema-sını,
+document type-ı, active owner/draft/latest lineage-i, privacy/legal/delete-only retention
+qərarını və bütün exact Unicode evidence span-lərini retained source revision-a qarşı
+transaction daxilində yenidən yoxlayır. Stale state `412` verir; yalnız aggregate bir
+addım irəliləyib latest decrypted correction request-lə eynidirsə retry idempotent sayılır.
+
+Yeni revision `user_correction` origin-i, exact schema ID/version, immutable predecessor,
+recomputed evidence counts, context-bound HMAC və AES-256-GCM ciphertext ilə append olunur.
+Model/provider/prompt provenance null qalır; generated revision və əvvəlki correction-lar
+heç vaxt update edilmir. Mövcud DB constraint/trigger-ləri bu shape və chain-i artıq
+qoruduğu üçün schema head `20260901_0012` olaraq qalır və yeni migration lazım olmayıb.
+
+Audit/outbox yalnız opaque IDs, origin/schema və bounded evidence counts saxlayır; owner
+audit actor-dur. Profile JSON, source quote/text, ciphertext, nonce və digest operational
+payload-lara düşmür. Privacy export `phase-1b-c2`-yə keçib və bütün generated/corrected
+revision-ları narrow decrypt/revalidation boundary-dən qaytarır; mövcud cascade erasure
+tam lineage-i silir. Route reviewed product SLI population-a əlavə edilib.
+
+Concrete provider adapter/credential/outbound call, public scheduling command və continuous
+worker supervisor yenə shipped deyil. Növbəti local gate Phase 1B-D labeled AZ/EN profile
+quality evaluation və regression approval-dur.
+
+Repository-wide verification `538` passed, bir platform-specific skip və `95.15%`
+branch-aware coverage ilə tamamlanıb. Ruff, strict mypy (`83` source faylı), migration
+round-trip/model parity, dependency compatibility və vulnerability gate-ləri keçib. Schema
+head dəyişmədən `20260901_0012`-dir. Restore rehearsal exact constraint/trigger inventarı
+ilə keçib; release image C2 kodu ilə yenidən build olunaraq non-root, embedded-head,
+migration-job və hardened runtime contract-larından keçib.
+
 ## 6. Hazırda mövcud HTTP API contract-ı
 
 | Method və route | Məqsəd | Scope/şərt |
@@ -1463,6 +1690,8 @@ Stop here until the next explicit continuation request.
 | `GET /api/v1/preparations/{preparation_id}/document-intakes/{intake_id}` | Owned durable intake status-u | `preparation:read` |
 | `GET /api/v1/preparations/{preparation_id}/document-versions/{document_version_id}/source-text` | Decrypted source-text lineage və aggregate ETag | `preparation:read` |
 | `PUT /api/v1/preparations/{preparation_id}/document-versions/{document_version_id}/source-text` | Owner correction append | `preparation:write` + strong `If-Match` |
+| `GET /api/v1/preparations/{preparation_id}/document-versions/{document_version_id}/profiles/{source_text_version_id}` | Safe job status və completed immutable profile history | `preparation:read` |
+| `PUT /api/v1/preparations/{preparation_id}/document-versions/{document_version_id}/profiles/{source_text_version_id}` | Evidence-revalidated encrypted profile correction append | `preparation:write` + strong `If-Match` |
 
 `POST /privacy/requests` scope mapping-i:
 
@@ -1511,6 +1740,9 @@ Hazırda `26` application table və Alembic-in `alembic_version` cədvəli var.
 | `candidate_source_texts` | 1A-D1 | Exact document version üçün owner-bound encrypted text aggregate |
 | `candidate_source_text_versions` | 1A-D1 | AES-GCM encrypted immutable parser/correction revision və provenance |
 | `candidate_extraction_jobs` | 1A-D2.1 | Durable exact-version extraction status, lease fencing, retry və safe errors |
+| `candidate_profiles` | 1B-B2.1 | Exact source revision üçün owner/privacy-bound encrypted profile aggregate |
+| `candidate_profile_versions` | 1B-B2.1 | AES-GCM encrypted append-only profile və model/prompt/schema provenance |
+| `candidate_profiling_jobs` | 1B-B2.2/C1 | Exact-source durable status, immutable release/privacy/processor snapshots, UUID lease fencing və dead-letter state |
 | `alembic_version` | Alembic | Database-in cari schema revision-u |
 
 Migration chain:
@@ -1525,9 +1757,12 @@ Migration chain:
   -> 20260827_0007 authenticated document intakes
   -> 20260827_0008 encrypted candidate source text
   -> 20260828_0009 durable candidate extraction jobs
+  -> 20260831_0010 encrypted immutable candidate profiles
+  -> 20260901_0011 durable fenced candidate profiling jobs
+  -> 20260901_0012 profiling processor-activity authorization gate
 ```
 
-API readiness exact `20260828_0009` revision-u tələb edir. Connected, amma başqa
+API readiness exact `20260901_0012` revision-u tələb edir. Connected, amma başqa
 revision-da olan database traffic üçün hazır sayılmır.
 
 ## 8. Security və privacy posture
@@ -1558,14 +1793,14 @@ revision-da olan database traffic üçün hazır sayılmır.
 
 ### 8.2 Qəsdən saxlanmayan məlumatlar
 
-Repository-də real istifadəçi datası seed edilməyib. Məhsul işlədildikdə yalnız bounded
-preparation target context-i saxlanıla bilər; aşağıdakılar hələ saxlanmır:
+Repository-də real istifadəçi datası seed edilməyib. Məhsul işlədildikdə original
+document bytes private storage-da, source text və strict profile JSON isə yalnız
+encrypted formada saxlanır; aşağıdakılar hələ saxlanmır:
 
 - password;
 - email, ad, avatar və geniş identity profile;
 - access/refresh token;
-- CV və JD content-i;
-- extracted document text;
+- PostgreSQL-də plaintext CV/JD, extracted source text və profile JSON;
 - interview answer/transcript;
 - evaluation/report;
 - embedding və knowledge content;
@@ -1626,6 +1861,11 @@ Bu cədvəldəki saylar hər mərhələ bitəndə bütün suite-in ümumi snapsh
 | 1A-A | 282 | 95.64% | 54 |
 | 1A-B | 290 | 95.47% | 57 |
 | 1A-C | 318 | 95.43% | 61 |
+| 1B-B1 | 470 | 95.35% | 76 |
+| 1B-B2.1 | 484 | 95.09% | 78 |
+| 1B-B2.2 | 500 | 95.09% | 80 |
+| 1B-C1 | 524 | 95.09% | 82 |
+| 1B-C2 | 538 | 95.15% | 83 |
 
 ### 9.3 Container/release verification
 
@@ -1681,6 +1921,15 @@ Release verification aşağıdakıları yoxlayır:
 | [0012](adr/0012-durable-authenticated-document-intake.md) | Hashed-idempotent, lease-based upload/paste saga və exact asset recovery | Qəbul edilib |
 | [0013](adr/0013-encrypted-immutable-candidate-source-text.md) | AES-256-GCM encrypted immutable source-text lineage və parser provenance | Qəbul edilib |
 | [0014](adr/0014-durable-candidate-extraction-jobs.md) | Exact-version extraction job, lease fencing və bounded retry contract | Qəbul edilib |
+| [0015](adr/0015-isolated-parser-worker.md) | No-network resource-bounded parser worker | Qəbul edilib |
+| [0016](adr/0016-owner-source-text-inspection-and-correction.md) | Owner-scoped source inspection və immutable correction | Qəbul edilib |
+| [0017](adr/0017-phase-1a-lifecycle-and-phase-gate.md) | Phase 1A privacy lifecycle və fixture gate | Qəbul edilib |
+| [0018](adr/0018-provider-neutral-model-gateway.md) | Disabled-by-default provider-neutral model execution boundary | Qəbul edilib |
+| [0019](adr/0019-evidence-linked-profile-contracts.md) | Strict exact-evidence CV/JD profile contract-ları | Qəbul edilib |
+| [0020](adr/0020-encrypted-candidate-profile-persistence.md) | Exact-source encrypted immutable candidate profiles | Qəbul edilib |
+| [0021](adr/0021-durable-fenced-profiling-jobs.md) | Exact-source idempotent jobs, UUID lease fencing və bounded dead-letter handling | Qəbul edilib |
+| [0022](adr/0022-policy-gated-profiling-execution.md) | Code-owned prompts, immutable processor authorization və fenced execution | Qəbul edilib |
+| [0023](adr/0023-owner-profile-inspection-and-correction.md) | Owner-only safe status/inspection və immutable evidence-revalidated profile correction | Qəbul edilib |
 
 ## 11. Repository xəritəsi
 
@@ -1696,7 +1945,7 @@ Release verification aşağıdakıları yoxlayır:
 |   |-- runbooks/               Backup, release, file və telemetry əməliyyatları
 |   |-- security/               Threat model və data inventory
 |   `-- status/                 Hər tamamlanmış mərhələnin exit record-u
-|-- migrations/versions/        Doqquz forward schema revision-u
+|-- migrations/versions/        On iki forward schema revision-u
 |-- scripts/                    Verification və restore rehearsal
 |-- src/ai_interviewer/
 |   |-- api/                    HTTP route/error contract-ları
@@ -1706,6 +1955,8 @@ Release verification aşağıdakıları yoxlayır:
 |   |-- identity/               JWT, principal, scope, account
 |   |-- persistence/            DB, schema, migrations, outbox, audit
 |   |-- privacy/                Policy, consent, retention, processor, deletion
+|   |-- model_gateway/          Provider-neutral execution contract və release identity
+|   |-- profiling/              Evidence schemas, encrypted profiles/jobs və owner correction
 |   `-- reliability/            Baseline evidence və CLI
 |-- tests/                      Unit və integration suite
 |-- Dockerfile                  API/migration/baseline release image
@@ -1716,10 +1967,10 @@ Release verification aşağıdakıları yoxlayır:
 
 Bu sənəd yazılan anda:
 
-- `65` Python source faylı;
-- `32` Python test faylı;
-- `9` Alembic revision faylı;
-- `42` Markdown sənədi;
+- `87` Python source faylı;
+- `49` Python test faylı;
+- `12` Alembic revision faylı;
+- `67` Markdown sənədi;
 - `4` operational PowerShell/Python script mövcuddur.
 
 ## 12. Qəsdən hələ edilməyənlər
@@ -1728,14 +1979,13 @@ Aşağıdakılar yarımçıq və ya placeholder kimi yazılmayıb; uyğun gate g
 başlanmayıb:
 
 - frontend və candidate onboarding UI;
-- document parser worker, extracted-text inspection və correction flow;
-- CV/JD profiling;
+- provider credential/supervisor və real-provider profile quality approval;
 - company/role/round knowledge base;
 - global source policy registry və ingestion connector-ları;
 - embeddings, `pgvector`, hybrid retrieval və RAG;
 - interview blueprint;
 - deterministic interview session state machine;
-- interviewer/evaluator model gateway;
+- interviewer/evaluator execution workflow;
 - skill state və adaptive policy;
 - final report;
 - voice/STT/TTS;
@@ -1746,34 +1996,51 @@ başlanmayıb:
 Bu yanaşma ona görə seçilib ki, file upload auth/privacy/deployment sərhədlərindən əvvəl,
 SLO ölçüdən əvvəl, alert isə owner və target-dən əvvəl yaradılmasın.
 
-## 13. Cari stop point — niyə növbəti hissə avtomatik davam etmir
+## 13. Cari stop point
 
-Cari tamamlanmış məhsul vahidi `1A-D2.1`-dir. İstifadəçinin təsdiq etdiyi
+Cari tamamlanmış məhsul vahidi `1B-D2.2b1`-dir. Phase 1A exact document/source lifecycle-i,
+1B-A model execution port-u, 1B-B1 strict exact-evidence CV/JD contract-ları, B2 encrypted
+profile/job contract-ını, C1 isə code-owned prompt, immutable processor authorization,
+encrypted usage registration və lease-fenced worker execution-u qurub. C2 authenticated
+owner status/inspection, strong ETag/`If-Match` və encrypted immutable correction append-i
+əlavə edib. D1 deterministic offline quality evaluator-u, fixed field/slice/span/review
+threshold-larını, synthetic AZ/EN CV/JD seed-i və evidence digest-ə bağlı ayrıca dörd
+reviewer rolunu əlavə edib. D2.1 disabled-by-default OpenAI Responses adapter-i əlavə
+edib. D2.2a exact corpus/prompt/model/time-window authorization-na və ayrıca operator
+confirmation-na bağlı private offline prediction runner-i və bilərəkdən unadjudicated
+review draft-ı əlavə edib; credential və real corpus saxlanmayıb, verification zamanı
+outbound model call edilməyib. D2.2b1 completed review-u exact corpus və prediction run-a
+yenidən bağlayan, immutable content drift-i və natamam human review-u rədd edən create-only
+evidence finalizer-i əlavə edib.
+
+Hazırkı düzgün dayanacaq real provider corpus-u və named approval üçün `1B-D2.2b2` gate-indədir.
+İstifadəçinin təsdiq etdiyi
 [ADR 0010](adr/0010-feature-stable-mvp-before-hosted-reliability-baseline.md) qərarına
 görə hosted 28 günlük baseline və ondan asılı 0D production gate-ləri text MVP-nin
 route/query/contract səthi feature-stable olana qədər təxirə salınıb. Onlar ləğv
 edilməyib və production-dan əvvəl mütləq tamamlanmalıdır.
 
-Hazırkı düzgün dayanacaq `1A-D2.2` isolated parser worker-dən əvvəldir. 1A-D1-də
-encrypted immutable source-text persistence, D2.1-də isə durable extraction job/lease/
-retry contract qurulub; parser, worker, HTTP inspection/correction, PII-redacted
-representation və AI emalı qəsdən yazılmayıb. Növbəti hissəyə başlamazdan əvvəl
-istifadəçinin təsdiqi gözlənilir.
-
 ## 14. Düzgün növbəti ardıcıllıq
 
-### 1A-D2.2 — Isolated parser execution
+### 1B-D2 — Reviewed release quality evidence and approval
 
-**Dependencies:** tamamlanmış 1A-C durable intake/clean immutable version, 1A-D1
-encrypted source-text domain və 1A-D2.1 durable extraction job/lease/retry contract;
-0C-C-də approved exact parser adapter/version/isolation policy.
-**İş:** released asset-i yalnız `read_for_parser` sərhədindən resource-bounded, read-only,
-non-root, no-network worker-ə vermək; PDF/DOCX/TXT adapterlərini ayrıca versionlamaq;
-bounded parser error-larını D2.1 taxonomy-sinə map etmək və crash-safe D1 persistence
-yaratmaq.
-**Completion:** corrupt, password-protected, parser-timeout/resource-limit və malicious
-fixture-lər fail closed edir; yalnız exact approved parser nəticəsi D1-ə yaza bilir;
-retry ikinci extraction yaratmır və heç bir model call edilmir.
+**Dependencies:** tamamlanmış 1A exact owner/source lifecycle və 1B-A-dan 1B-C2-yə qədər
+model/profile execution, persistence, status və correction contract-ları.
+**Hazırdır (D1):** strict labeled evidence/adjudication schema-sı, fixture
+rights/provenance contract-ı, field-level precision/recall, exact span coverage,
+correction-rate, dil/document/adversarial slice ölçüləri, fixed threshold policy,
+payload-safe CLI və evidence digest-ə bağlı ayrıca approval schema-sı.
+**Hazırdır (D2.1):** reviewed, disabled-by-default OpenAI Responses adapter-i; strict
+non-stored structured output; exact response-model yoxlaması; server-only secret delivery;
+mock-transport verification. **Hazırdır (D2.2a):** exact digest/time-window authorization,
+explicit external-processing confirmation, private prediction artifact və unadjudicated
+review draft tooling-i. **Hazırdır (D2.2b1):** exact review finalization, immutable
+corpus/prediction/provenance/order drift rejection, exhaustive adjudication və owner-review
+completion checks. **Qalıb (D2.2b2):** rights-cleared tam corpus üzərində approved
+exact OpenAI release run-u; exhaustive human adjudication; recorded error analysis; bütün
+threshold-ların keçməsi; product, engineering, AZ language və EN language rollarının
+named approval-u. Concrete provider activation və continuous supervisor ayrıca reviewed
+gate olaraq qalır.
 
 ### Təxirə salınmış mandatory pre-production gate-lər
 
@@ -1821,10 +2088,88 @@ sərhədi, privacy lifecycle, encrypted/quarantined file contract, hardened rele
 payload-blind telemetry, sübuta bağlı reliability measurement tooling və ilk
 owner-bound preparation target aggregate-i, immutable CV/JD metadata lineage-i və
 recoverable authenticated upload/paste saga-sı, encrypted immutable source-text
-lineage-i və durable extraction-job contract-ı.
+lineage-i, durable extraction-job contract-ı, exact-release model gateway-i, strict
+evidence-linked CV/JD contract-ları və encrypted immutable profile lineage-i.
+
+Bu foundation-a durable exact-source profiling job contract-ı, UUID lease fencing,
+bounded retry, explicit dead-letter state, code-owned prompt release-ləri, immutable
+processor authorization ilə policy-gated worker və owner-only immutable profile correction
+də daxildir. D1 offline deterministic profile-quality evaluator-u, fixed threshold-ları,
+synthetic AZ/EN CV/JD seed-i və separate digest-bound approval contract-ını da qurub.
 
 Ən vacib prinsip qorunub: sonrakı mərhələnin funksiyası əvvəlki gate tamamlanmadan
-kod bazasına gətirilməyib. Hazırkı düzgün dayanacaq 1A-D2.1-dən sonra, 1A-D2.2-dən
-əvvəldir.
+kod bazasına gətirilməyib. Hazırkı düzgün dayanacaq D2.2b1 exact review finalizer-dan sonra,
+real-provider corpus və named regression approval gate-i olan D2.2b2-dədir.
 Hosted reliability işi daha gec ediləcək, amma production gate kimi roadmap və ADR-də
 açıq qalır.
+
+## 17. Phase 1B-D2.1 OpenAI Responses adapter
+
+OpenAI was selected as the first concrete provider for the Phase 1B quality run. The
+repository now includes a disabled-by-default Responses API adapter behind the existing
+provider-neutral gateway. It sends strict JSON Schema output requests to the fixed OpenAI
+endpoint with `store=false`, `background=false`, `truncation=disabled`, no tools, and the
+durable job UUID as `X-Client-Request-Id`. The response-reported model release is checked
+by the existing gateway before output is accepted.
+
+Schema defaults are removed for provider compatibility, every object property becomes
+required, and `additionalProperties=false` is enforced recursively. The original strict
+application schema and exact-source evidence checks remain the final authorities. HTTP,
+timeout, network, refusal, incomplete, malformed, oversized, and model-drift outcomes
+fail closed through payload-free codes.
+
+OpenAI credentials are server-only `SecretStr` values. Development can use an ignored
+local environment secret; hosted environments require an absolute orchestrator-mounted
+secret file. The adapter, gateway, and profiling worker remain disabled by default. All
+adapter tests use a local mock transport, so no credential, candidate data, billing event,
+or external call was produced in D2.1.
+
+The remaining Phase 1B-D2.2 work is the rights-cleared full AZ/EN CV/JD corpus, approved
+processor activity and exact model release, prediction capture, exhaustive human
+adjudication, slice/error analysis, all fixed threshold passes, and four named
+evidence-digest-bound approvals. Product activation and continuous supervision are still
+separate reviewed gates.
+
+## 18. Phase 1B-D2.2a authorized offline quality runner
+
+D2.1 transport-u real corpus-a qoşmazdan əvvəl ayrıca operator/governance sərhədi əlavə
+edildi. Strict corpus gold profile və exact source evidence-ni doğrulayır. Ayrı approval
+artifact-i canonical corpus SHA-256, dataset/version, current prompt digest, exact OpenAI
+release, processor/data-control references, approver və active aware time window-a bağlanır.
+
+`generate` yalnız `--confirm-external-processing` ilə işləyir; mismatch/expiry provider
+çağırışından əvvəl bağlanır. Maximum 200 fixture sequential icra olunur, request UUID-ləri
+deterministikdir, nəticə strict prediction və ya safe failure-dır. Output yalnız bütün run
+bitəndən sonra yeni private fayl kimi yaradılır və content-free digest/count summary verir.
+
+`prepare-review` exact corpus/run join edir, amma human qərarı uydurmur: adjudication boş,
+owner review isə `not_reviewed` qalır. Buna görə draft final evidence schema-sını keçmir.
+Unit test-lər in-memory provider istifadə edir; real API call, billing, credential, corpus,
+prediction, adjudication və approval yaradılmayıb. Qalan D2.2b2 işi approved full corpus
+run-u, human review/error analysis, bütün threshold-lar və dörd named approval-dur.
+
+Tam `./scripts/verify.ps1` nəticəsi: `608 passed, 1 skipped`, `95.53%` combined branch
+coverage, Ruff check/format `217` fayl, strict mypy `87` source fayl, sıfırdan `12`
+PostgreSQL migration, dependency compatibility və vulnerability audit uğurludur.
+
+## 19. Phase 1B-D2.2b1 exact human-review finalization
+
+`finalize-review` original corpus, exact prediction run və human tərəfindən tamamlanmış
+review artifact-ını birlikdə tələb edir. Tool canonical unreviewed draft-ı yenidən qurur
+və reviewer-in yalnız `adjudications` və `owner_review_outcome` sahələrini dəyişməsinə
+icazə verir. Source text, rights provenance, risk slice, expected profile, prediction,
+model/prompt coordinate və fixture order dəyişərsə finalization fail-closed olur.
+
+Hər fixture üçün owner review məcburidir. Strict `LabeledProfileFixture` contract-ı hər
+gold və predicted claim-in exact bir dəfə, eyni field daxilində adjudicate edilməsini
+tələb edir. Uğurlu nəticə overwrite etmədən private `ProfileQualityEvidence` yaradır və
+stdout-a yalnız artifact/evidence digest-i, fixture count və safe status yazır. Provider
+çağırışı və automatic approval yoxdur.
+
+[ADR 0027](adr/0027-exact-human-review-finalization.md) bu keçidi ayrıca local security
+boundary kimi qəbul edir. Real rights-cleared corpus, approved OpenAI run, qualified human
+review/error analysis, threshold success və dörd named approval hələ D2.2b2-də qalır.
+
+Tam `./scripts/verify.ps1` nəticəsi: `610 passed, 1 skipped`, `95.57%` combined branch
+coverage, Ruff check/format `220` fayl, strict mypy `87` source fayl, sıfırdan `12`
+PostgreSQL migration, dependency compatibility və vulnerability audit uğurludur.

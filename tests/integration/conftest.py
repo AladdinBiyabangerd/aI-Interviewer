@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Iterator
 import pytest
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import create_engine, text
 
 from ai_interviewer.core.config import Settings
 from ai_interviewer.persistence.database import Database
@@ -14,6 +15,19 @@ def _test_database_url() -> str:
     if not value:
         pytest.skip("AI_INTERVIEWER_TEST_DATABASE_URL is required for integration tests")
     return value
+
+
+def _rebuild_public_schema(database_url: str) -> None:
+    """Give every integration test a fresh schema without touching any other database."""
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA public CASCADE"))
+            connection.execute(text("CREATE SCHEMA public"))
+    finally:
+        engine.dispose()
+
+    command.upgrade(Config("alembic.ini"), "head")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -32,6 +46,12 @@ def migrated_database() -> Iterator[str]:
         os.environ.pop("AI_INTERVIEWER_DATABASE_URL", None)
     else:
         os.environ["AI_INTERVIEWER_DATABASE_URL"] = previous_url
+
+
+@pytest.fixture(autouse=True)
+def isolated_database_schema(migrated_database: str) -> None:
+    """Prevent durable rows from one integration test affecting another test's assertions."""
+    _rebuild_public_schema(migrated_database)
 
 
 @pytest.fixture
