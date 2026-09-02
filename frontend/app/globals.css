@@ -70,10 +70,11 @@ button:disabled { cursor: not-allowed; }
   place-items: center;
   border: 1px solid var(--text);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 750;
   letter-spacing: -0.02em;
 }
+.brand > b { font: inherit; }
 .preparation-nav { margin: 0 auto; display: flex; align-self: stretch; gap: 28px; }
 .preparation-nav button {
   position: relative;
@@ -95,8 +96,31 @@ button:disabled { cursor: not-allowed; }
 }
 .preparation-nav button:hover, .preparation-nav button.active { color: var(--text); }
 .preparation-nav button.active::after { background: var(--accent); }
-.header-action {
+.language-switch {
   margin-left: auto;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.language-switch button {
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+.language-switch button:hover { color: var(--text); }
+.language-switch button.active { background: var(--accent-soft); color: var(--accent); }
+.language-switch > span { color: var(--border-strong); font-size: 12px; }
+.header-action {
+  margin-left: 0;
   min-height: 40px;
   padding: 0 15px;
   border: 1px solid var(--border-strong);
@@ -474,8 +498,9 @@ h1, h2, h3, p { text-wrap: pretty; }
 }
 
 @media (max-width: 480px) {
-  .header-action { font-size: 0; }
-  .header-action::after { content: "New"; font-size: 13px; }
+  .brand > b { display: none; }
+  .header-action span { display: none; }
+  .header-action::after { content: attr(data-short-label); font-size: 13px; }
   .home-intro { padding-top: 20px; }
   .home-intro .button, .answer-footer .button { width: 100%; }
   .preview-header { align-items: flex-start; flex-direction: column; gap: 14px; }

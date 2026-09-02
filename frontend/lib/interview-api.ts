@@ -214,6 +214,81 @@ function buildQuestions(details: InterviewDetails): PreparationQuestion[] {
   return [...cvQuestions, ...technical, ...general].slice(0, 9);
 }
 
+function localizeQuestions(questions: PreparationQuestion[], details: InterviewDetails): PreparationQuestion[] {
+  if (details.language !== "Azerbaijani") return questions;
+
+  const text: Record<string, Pick<PreparationQuestion, "question" | "reason" | "approach" | "followUp">> = {
+    "rag-architecture": {
+      question: "Sənədlərin qəbulundan yekun cavaba qədər production səviyyəli RAG sistemini necə dizayn edərdiniz?",
+      reason: "Vakansiya tətbiqi AI sistemlərini vurğulayır. Buna görə arxitektura seçimləri, retrieval və generation sərhədləri yoxlanıla bilər.",
+      approach: ["İstifadə ssenarisini müəyyən edin", "Məlumat qəbulu və retrieval hissəsini izah edin", "Trade-off-ları göstərin", "Qiymətləndirmə və monitorinqlə tamamlayın"],
+      followUp: "Yekun LLM cavabından asılı olmadan retrieval keyfiyyətini necə qiymətləndirərdiniz?",
+    },
+    "rag-evaluation": {
+      question: "RAG sistemini production mühitinə çıxarmazdan əvvəl retrieval keyfiyyətini necə qiymətləndirərdiniz?",
+      reason: "Qiymətləndirmə işlək prototipi etibarlı production sistemindən ayırır və texniki dərinliyi birbaşa yoxlayır.",
+      approach: ["Retrieval və generation qiymətləndirməsini ayırın", "Uyğun metrikləri seçin", "Qiymətləndirmə dəsti yaradın", "Production dəyişikliklərini izləyin"],
+      followUp: "İşarələnmiş relevance məlumatınız olmasaydı, qiymətləndirməni necə dəyişərdiniz?",
+    },
+    "api-reliability": {
+      question: "Pik trafik zamanı gecikməsi kəskin artan API-ni necə araşdırardınız?",
+      reason: "Vəzifə backend məsuliyyətini tələb edir. Buna görə performans diaqnostikası və təhlükəsiz production qərarları vacibdir.",
+      approach: ["Simptom və təsiri müəyyən edin", "Trace və saturation metriklərindən istifadə edin", "Alternativ hipotezləri yoxlayın", "Təhlükəsiz dəyişikliyi təsdiqləyin"],
+      followUp: "Database yüklənməsini tətbiq səviyyəsindəki resurs rəqabətindən hansı siqnal ilə ayırardınız?",
+    },
+    "production-deployment": {
+      question: "Rollout riskini məhdudlaşdırmaqla bu sistemi production mühitinə necə yerləşdirib izləyərdiniz?",
+      reason: "Production və deployment tələbləri observability, rollout nəzarəti və əməliyyat məsuliyyəti haqqında suallar yaradır.",
+      approach: ["Release prosesini izah edin", "Xidmət səviyyəsi siqnallarını müəyyən edin", "Təsir dairəsini məhdudlaşdırın", "Rollback meyarlarını açıqlayın"],
+      followUp: "Hansı vəziyyətdə deployment-i dayandırar və ya geri qaytarardınız?",
+    },
+    "technical-tradeoff": {
+      question: `${details.role} kimi məsul olacağınız çətin texniki qərarı təsvir edin. Alternativləri necə müqayisə edərdiniz?`,
+      reason: "Bu sual bir həlli universal düzgün kimi təqdim etmək əvəzinə texniki seçimləri məhdudiyyətlərlə əlaqələndirmək bacarığını yoxlayır.",
+      approach: ["Qərarı müəyyən edin", "Məhdudiyyətləri sadalayın", "Real alternativləri müqayisə edin", "Ölçülmüş nəticəni izah edin"],
+      followUp: "Hansı yeni məlumat bu qərarı dəyişməyinizə səbəb olardı?",
+    },
+    "failure-analysis": {
+      question: "Kritik xidmət gözlənilmədən dayanır. İlk 30 dəqiqədə nə edərdiniz?",
+      reason: "Production sistemlərinə cavabdeh vəzifələrdə, xüsusilə yüksək əlçatanlıq tələb olunan sahələrdə əməliyyat mühakiməsi vacib siqnaldır.",
+      approach: ["İstifadəçiləri qoruyun", "Məsuliyyəti bölüşdürün", "Yüksək siqnallı məlumat toplayın", "Kommunikasiya qurub xidməti bərpa edin"],
+      followUp: "Kök səbəb hələ məlum olmayanda insident prosesini necə hərəkətdə saxlayardınız?",
+    },
+    "cv-project": {
+      question: `CV-nizdə ${details.role} vəzifəsinə hazırlığınızı ən yaxşı göstərən layihəni seçin. Şəxsən hansı hissəyə cavabdeh idiniz?`,
+      reason: "Müsahibəçilər adətən CV-də vəzifəyə ən uyğun iddianı yoxlayır və namizədin şəxsi töhfəsini dəqiqləşdirirlər.",
+      approach: ["Layihənin kontekstini verin", "Şəxsi məsuliyyətinizi aydın göstərin", "Əsas qərarlardan birini izah edin", "Nəticəni rəqəmlərlə göstərin"],
+      followUp: "Bu nəticənin hansı hissəsi konkret olaraq sizin qərarlarınızla bağlı idi?",
+    },
+    "cv-depth": {
+      question: "CV-nizdəki hansı texniki iddianı bu gün yenidən həyata keçirmək daha çətin olardı və ondan nə öyrəndiniz?",
+      reason: "Bu sual yüklənmiş faylda təsdiqlənməmiş detalları fərz etmədən yazılı iddiaların arxasındakı dərinliyi araşdırır.",
+      approach: ["İddianı müəyyən edin", "Real məhdudiyyəti izah edin", "Çətin hissəni göstərin", "Yanaşmanızda nəyin dəyişdiyini paylaşın"],
+      followUp: "Həllin işlədiyini bilmək üçün hansı sübutlardan istifadə etdiniz?",
+    },
+    introduction: {
+      question: `Özünüz haqqında danışın və ${details.role} vəzifəsinə ən uyğun təcrübənizi izah edin.`,
+      reason: "Qısa təqdimat müsahibəçiyə konkret sübutlara keçməzdən əvvəl təcrübənizi vəzifə ilə əlaqələndirməyə kömək edir.",
+      approach: ["Hazırkı fokusunuzla başlayın", "İki uyğun təcrübə seçin", "Onları bu vəzifə ilə əlaqələndirin", "Cavabı qısa saxlayın"],
+      followUp: "Bu təcrübələrdən hansı növbəti mərhələdə görmək istədiyiniz işi daha yaxşı əks etdirir?",
+    },
+    "company-motivation": {
+      question: `${details.company} şirkəti və ${details.role} vəzifəsi ilə niyə maraqlanırsınız?`,
+      reason: "Motivasiya və şirkətə uyğunluq adətən yoxlanılır, lakin cavab şəxsən təsdiqlədiyiniz faktlara əsaslanmalıdır.",
+      approach: ["Təsdiqlənmiş şirkət səbəbi göstərin", "Onu vəzifə ilə əlaqələndirin", "Töhfənizi izah edin", "Ümumi təriflərdən qaçın"],
+      followUp: "Bu vəzifəni sizin üçün mənalı növbəti addıma nə çevirərdi?",
+    },
+    "behavioral-conflict": {
+      question: "Texniki qərarla bağlı fikir ayrılığını və komandanın nəticəyə gəlməsinə necə kömək etdiyinizi danışın.",
+      reason: "Bu sual yalnız texniki biliyi deyil, əməkdaşlığı, sübuta əsaslanan qərarverməni və məsuliyyəti yoxlayır.",
+      approach: ["Vəziyyəti təsvir edin", "Fərqli mövqeləri izah edin", "Atdığınız addımı göstərin", "Nəticə və öyrəndiyiniz dərslə tamamlayın"],
+      followUp: "Eyni fikir ayrılığı indi baş versəydi, nəyi fərqli edərdiniz?",
+    },
+  };
+
+  return questions.map((question) => ({ ...question, ...(text[question.id] ?? {}) }));
+}
+
 function buildLocalAnalysis(details: InterviewDetails): InterviewAnalysis {
   const context = `${details.role} ${details.jobDescription}`;
   const focusAreas: FocusArea[] = [];
@@ -246,7 +321,7 @@ function buildLocalAnalysis(details: InterviewDetails): InterviewAnalysis {
           { label: "Measured outcomes", priority: "Medium" },
         ]
       : [],
-    questions: buildQuestions(details),
+    questions: localizeQuestions(buildQuestions(details), details),
   };
 }
 

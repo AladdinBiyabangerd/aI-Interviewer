@@ -32,6 +32,8 @@ test("keeps the complete interview journey and backend boundary in focused modul
   const { readFile } = await import("node:fs/promises");
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const api = await readFile(new URL("../lib/interview-api.ts", import.meta.url), "utf8");
+  const uiCopy = await readFile(new URL("../lib/ui-copy.ts", import.meta.url), "utf8");
+  const productSource = `${page}\n${uiCopy}`;
 
   for (const requiredCopy of [
     "Job Description / Requirements",
@@ -44,12 +46,28 @@ test("keeps the complete interview journey and backend boundary in focused modul
     "Submit Answer",
     "Interview complete",
   ]) {
-    assert.ok(page.includes(requiredCopy), `missing journey copy: ${requiredCopy}`);
+    assert.ok(productSource.includes(requiredCopy), `missing journey copy: ${requiredCopy}`);
   }
   assert.match(api, /NEXT_PUBLIC_INTERVIEW_API_BASE_URL/);
   assert.match(api, /interview-preparations\/analyze/);
   assert.match(api, /companyCoverage: "Limited"/);
   assert.doesNotMatch(page, /avatar|camera|video interview|chat bubble/i);
+});
+
+test("offers complete Azerbaijani and English interface choices", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const uiCopy = await readFile(new URL("../lib/ui-copy.ts", import.meta.url), "utf8");
+  const api = await readFile(new URL("../lib/interview-api.ts", import.meta.url), "utf8");
+
+  assert.match(page, />AZ<\/button>/);
+  assert.match(page, />EN<\/button>/);
+  assert.match(page, /document\.documentElement\.lang = uiLanguage/);
+  assert.match(uiCopy, /Sizi həqiqətən gözləyən müsahibəyə hazırlaşın/);
+  assert.match(uiCopy, /Müsahibə dili/);
+  assert.match(uiCopy, /Ehtimal olunan müsahibə sualları/);
+  assert.match(api, /details\.language !== "Azerbaijani"/);
+  assert.match(api, /RAG sistemini production mühitinə çıxarmazdan əvvəl/);
 });
 
 test("keeps professional desktop scale without changing the responsive flow", async () => {
@@ -60,6 +78,7 @@ test("keeps professional desktop scale without changing the responsive flow", as
   assert.match(css, /--form-width:\s*1160px/);
   assert.match(css, /--content-width:\s*1180px/);
   assert.match(css, /\.header-inner\s*{[^}]*min-height:\s*68px/s);
+  assert.match(css, /\.language-switch\s*{/);
   assert.match(css, /\.home-hero\s*{[^}]*grid-template-columns:\s*minmax\(0, 1\.04fr\)/s);
   assert.match(css, /\.home-intro h1\s*{[^}]*48px/s);
   assert.match(css, /\.interview-form input, \.interview-form select\s*{[^}]*height:\s*50px/s);
