@@ -183,6 +183,7 @@ export const uiCopy = {
       prepare: "Prepare Interview",
       invalidFile: "Please choose a PDF or DOCX file.",
       fileTooLarge: "The CV must be smaller than 10 MB.",
+      fileReadError: "We could not read this CV. Please choose the file again.",
       prepareError: "We could not prepare this interview. Please check the details and try again.",
     },
     analysis: {
@@ -197,6 +198,14 @@ export const uiCopy = {
       companyData: "Company-specific data",
       limited: "Limited",
       strong: "Strong",
+      liveResearch: "Live research",
+      localPreview: "Local preview",
+      evidence: "Public evidence",
+      sourcesUsed: (count: number) => `${count} research source${count === 1 ? "" : "s"} used`,
+      companySignals: "Company research",
+      companySignalsTitle: "Verified signals shaping these questions",
+      companySignalsIntro: "Only public signals that could be linked to a source are included here.",
+      previewNote: "Live company research is unavailable, so these questions use only vacancy and role patterns. They are not presented as company-specific.",
       limitedNote: "Public interview information for this company is limited. Questions are weighted more heavily toward the vacancy, role, industry and your CV.",
       strongNote: "Company-specific signals are available and are combined with the vacancy, role, industry and your CV.",
       likelyFocus: "Likely focus",
@@ -225,6 +234,7 @@ export const uiCopy = {
       practice: "Practice",
       whyTitle: "Why it matters",
       approachTitle: "A strong answer should cover",
+      evidence: "Evidence",
     },
     practice: {
       eyebrow: "Practice interview",
@@ -282,6 +292,7 @@ export const uiCopy = {
     interviewLanguageLabels: englishInterviewLanguageLabels,
     focusAreaLabels: { rag: "RAG / LLM systems", python: "Python and API engineering", deployment: "Production deployment", decisions: "Technical decision-making", evidence: "Clear evidence and outcomes", ownership: "Project ownership", technicalDecisions: "Technical decisions", outcomes: "Measured outcomes" },
     priorityLabels: { High: "High", Medium: "Medium" },
+    specificityLabels: { "Company evidence": "Company evidence", Vacancy: "Vacancy evidence", "Role pattern": "Role pattern" },
   },
   az: {
     localeName: "Azərbaycan dili",
@@ -377,6 +388,7 @@ export const uiCopy = {
       prepare: "Müsahibəni hazırla",
       invalidFile: "PDF və ya DOCX faylı seçin.",
       fileTooLarge: "CV faylı 10 MB-dan kiçik olmalıdır.",
+      fileReadError: "CV faylını oxuya bilmədik. Faylı yenidən seçin.",
       prepareError: "Müsahibə hazırlığını yarada bilmədik. Məlumatları yoxlayıb yenidən cəhd edin.",
     },
     analysis: {
@@ -391,6 +403,14 @@ export const uiCopy = {
       companyData: "Şirkətə aid məlumat",
       limited: "Məhdud",
       strong: "Güclü",
+      liveResearch: "Canlı araşdırma",
+      localPreview: "Lokal önbaxış",
+      evidence: "Açıq mənbə sübutları",
+      sourcesUsed: (count: number) => `${count} araşdırma mənbəsindən istifadə edilib`,
+      companySignals: "Şirkət araşdırması",
+      companySignalsTitle: "Sualları formalaşdıran təsdiqlənmiş siqnallar",
+      companySignalsIntro: "Burada yalnız açıq mənbə ilə əlaqələndirilə bilən şirkət siqnalları göstərilir.",
+      previewNote: "Canlı şirkət araşdırması əlçatan deyil. Bu suallar yalnız vakansiya və vəzifə nümunələrinə əsaslanır və şirkətə özəl kimi təqdim edilmir.",
       limitedNote: "Bu şirkət üçün açıq müsahibə məlumatı məhduddur. Suallar daha çox vakansiya, vəzifə, sahə və CV məlumatlarına əsaslanır.",
       strongNote: "Şirkətə aid siqnallar mövcuddur və vakansiya, vəzifə, sahə və CV məlumatları ilə birlikdə istifadə olunur.",
       likelyFocus: "Ehtimal olunan fokus",
@@ -419,6 +439,7 @@ export const uiCopy = {
       practice: "Praktika et",
       whyTitle: "Niyə vacibdir",
       approachTitle: "Güclü cavab bunları əhatə etməlidir",
+      evidence: "Mənbə",
     },
     practice: {
       eyebrow: "Müsahibə praktikası",
@@ -476,6 +497,7 @@ export const uiCopy = {
     interviewLanguageLabels: azerbaijaniInterviewLanguageLabels,
     focusAreaLabels: { rag: "RAG / LLM sistemləri", python: "Python və API mühəndisliyi", deployment: "Production mühitinə yerləşdirmə", decisions: "Texniki qərarvermə", evidence: "Aydın sübut və nəticələr", ownership: "Layihədə şəxsi məsuliyyət", technicalDecisions: "Texniki qərarlar", outcomes: "Ölçülə bilən nəticələr" },
     priorityLabels: { High: "Yüksək", Medium: "Orta" },
+    specificityLabels: { "Company evidence": "Şirkət mənbəsi", Vacancy: "Vakansiya mənbəsi", "Role pattern": "Vəzifə nümunəsi" },
   },
 } as const;
 

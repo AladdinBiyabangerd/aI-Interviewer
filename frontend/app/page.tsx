@@ -64,6 +64,8 @@ const initialDetails: InterviewDetails = {
   stage: "Not sure",
   language: "English",
   cvFileName: null,
+  cvFileType: null,
+  cvFileData: null,
 };
 
 const seniorities: Seniority[] = ["Not specified", "Intern", "Junior", "Mid-level", "Senior", "Lead"];
@@ -254,7 +256,7 @@ function InterviewForm({
     onChange({ ...value, [key]: nextValue });
   }
 
-  function selectFile(event: ChangeEvent<HTMLInputElement>) {
+  async function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     const extension = file.name.split(".").pop()?.toLocaleLowerCase("en-US");
@@ -269,7 +271,18 @@ function InterviewForm({
       return;
     }
     setFileError(null);
-    update("cvFileName", file.name);
+    try {
+      const cvFileData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("invalid file data"));
+        reader.onerror = () => reject(reader.error ?? new Error("file read failed"));
+        reader.readAsDataURL(file);
+      });
+      onChange({ ...value, cvFileName: file.name, cvFileType: file.type, cvFileData });
+    } catch {
+      setFileError(t.form.fileReadError);
+      event.target.value = "";
+    }
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -319,7 +332,7 @@ function InterviewForm({
             <div className="uploaded-file">
               <span className="file-type" aria-hidden="true">CV</span>
               <p><strong>{value.cvFileName}</strong><small>{t.form.readyToReview}</small></p>
-              <button type="button" onClick={() => { update("cvFileName", null); if (fileInput.current) fileInput.current.value = ""; }}>{t.form.remove}</button>
+              <button type="button" onClick={() => { onChange({ ...value, cvFileName: null, cvFileType: null, cvFileData: null }); if (fileInput.current) fileInput.current.value = ""; }}>{t.form.remove}</button>
             </div>
           ) : (
             <label className="upload-field">
@@ -376,10 +389,24 @@ function PreparationHeader({ analysis }: { analysis: InterviewAnalysis }) {
 function CoverageNotice({ analysis }: { analysis: InterviewAnalysis }) {
   const { t } = useInterfaceLanguage();
   return (
-    <section className="coverage-notice" aria-label={t.preparation.coverageAria}>
-      <div><p>{t.preparation.companyData}</p><strong>{analysis.companyCoverage === "Strong" ? t.preparation.strong : t.preparation.limited}</strong></div>
-      <p>{analysis.companyCoverage === "Strong" ? t.preparation.strongNote : t.preparation.limitedNote}</p>
-    </section>
+    <>
+      <section className="coverage-notice" aria-label={t.preparation.coverageAria}>
+        <div>
+          <p>{t.preparation.companyData}</p>
+          <strong>{analysis.companyCoverage === "Strong" ? t.preparation.strong : t.preparation.limited}</strong>
+          <span className={`analysis-mode ${analysis.analysisMode}`}>{analysis.analysisMode === "live_research" ? t.preparation.liveResearch : t.preparation.localPreview}</span>
+        </div>
+        <p>{analysis.analysisMode === "local_preview" ? t.preparation.previewNote : analysis.companyCoverage === "Strong" ? t.preparation.strongNote : t.preparation.limitedNote}</p>
+      </section>
+      {analysis.researchSources.length ? (
+        <section className="research-sources" aria-labelledby="research-sources-title">
+          <div><p className="eyebrow">{t.preparation.evidence}</p><h2 id="research-sources-title">{t.preparation.sourcesUsed(analysis.researchSources.length)}</h2></div>
+          <div className="research-source-links">
+            {analysis.researchSources.map((source) => <a href={source.url} key={source.id} target="_blank" rel="noreferrer"><span>{source.title}</span><small>{source.domain}</small></a>)}
+          </div>
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -389,6 +416,26 @@ function Overview({ analysis, onQuestions, onPractice }: { analysis: InterviewAn
     <main className="page prepared-page">
       <PreparationHeader analysis={analysis} />
       <CoverageNotice analysis={analysis} />
+
+      {analysis.companySignals.length ? (
+        <section className="company-signal-section" aria-labelledby="company-signal-heading">
+          <div>
+            <p className="eyebrow">{t.preparation.companySignals}</p>
+            <h2 id="company-signal-heading">{t.preparation.companySignalsTitle}</h2>
+            <p>{t.preparation.companySignalsIntro}</p>
+          </div>
+          <ol>
+            {analysis.companySignals.map((item, index) => (
+              <li key={`${item.signal}-${index}`}>
+                <p>{item.signal}</p>
+                <div>
+                  {item.evidence.map((source) => <a href={source.url} key={source.id} target="_blank" rel="noreferrer">{source.domain}</a>)}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
 
       <section className="focus-section" aria-labelledby="focus-heading">
         <div className="section-heading"><div><p className="eyebrow">{t.preparation.likelyFocus}</p><h2 id="focus-heading">{t.preparation.explore}</h2></div><p>{t.preparation.focusIntro}</p></div>
@@ -416,7 +463,13 @@ function QuestionRow({ question, index, onPractice }: { question: PreparationQue
       <span className="question-number">{String(index + 1).padStart(2, "0")}</span>
       <div className="question-content">
         <h3>{question.question}</h3>
-        <p className="source-line">{question.sources.map((source) => t.sourceLabels[source]).join(" · ")}</p>
+        <p className="source-line">{question.sources.map((source) => t.sourceLabels[source]).join(" · ")}<span>{t.specificityLabels[question.specificity]}</span></p>
+        {question.evidence.length ? (
+          <div className="question-evidence" aria-label={t.questions.evidence}>
+            <span>{t.questions.evidence}</span>
+            {question.evidence.map((source) => <a href={source.url} key={source.id} target="_blank" rel="noreferrer">{source.domain}</a>)}
+          </div>
+        ) : null}
         <div className="question-actions">
           <button type="button" aria-expanded={openPanel === "reason"} onClick={() => setOpenPanel(openPanel === "reason" ? null : "reason")}>{t.questions.why}</button>
           <button type="button" aria-expanded={openPanel === "approach"} onClick={() => setOpenPanel(openPanel === "approach" ? null : "approach")}>{t.questions.approach}</button>

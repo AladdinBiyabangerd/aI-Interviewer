@@ -11,6 +11,16 @@ export type Seniority = "Not specified" | "Intern" | "Junior" | "Mid-level" | "S
 export type InterviewLanguage = "English" | "Azerbaijani";
 export type QuestionCategory = "HR / Recruiter" | "CV Questions" | "Technical Questions" | "System Design";
 export type QuestionSource = "Company" | "Job Description" | "CV" | "Role" | "Industry" | "Interview Pattern";
+export type AnalysisMode = "live_research" | "local_preview";
+
+export type ResearchSource = {
+  id: string;
+  title: string;
+  url: string;
+  domain: string;
+};
+
+export type QuestionEvidence = ResearchSource;
 
 export type InterviewDetails = {
   company: string;
@@ -21,6 +31,8 @@ export type InterviewDetails = {
   stage: InterviewStage;
   language: InterviewLanguage;
   cvFileName: string | null;
+  cvFileType?: string | null;
+  cvFileData?: string | null;
 };
 
 export type PreparationQuestion = {
@@ -31,6 +43,8 @@ export type PreparationQuestion = {
   reason: string;
   approach: string[];
   followUp: string;
+  evidence: QuestionEvidence[];
+  specificity: "Company evidence" | "Vacancy" | "Role pattern";
 };
 
 export type FocusArea = {
@@ -44,6 +58,9 @@ export type InterviewAnalysis = {
   details: InterviewDetails;
   companyCoverage: "Limited" | "Strong";
   companyCoverageNote: string;
+  analysisMode: AnalysisMode;
+  researchSources: ResearchSource[];
+  companySignals: Array<{ signal: string; evidence: ResearchSource[] }>;
   focusAreas: FocusArea[];
   cvAreas: FocusArea[];
   questions: PreparationQuestion[];
@@ -83,6 +100,8 @@ function buildTechnicalQuestions(details: InterviewDetails): PreparationQuestion
           "The vacancy emphasizes applied AI systems, so architecture choices and the boundaries between retrieval and generation are likely to be explored.",
         approach: ["Define the use case", "Cover ingestion and retrieval", "Explain trade-offs", "Close with evaluation and monitoring"],
         followUp: "How would you evaluate retrieval quality independently from the final LLM response?",
+        evidence: [],
+        specificity: "Vacancy",
       },
       {
         id: "rag-evaluation",
@@ -93,6 +112,8 @@ function buildTechnicalQuestions(details: InterviewDetails): PreparationQuestion
           "Evaluation distinguishes a working prototype from a reliable production system and directly tests technical depth.",
         approach: ["Separate retrieval and generation", "Choose relevant metrics", "Build an evaluation set", "Monitor production drift"],
         followUp: "How would your evaluation change if you had no labeled relevance data?",
+        evidence: [],
+        specificity: "Vacancy",
       },
     );
   }
@@ -107,6 +128,8 @@ function buildTechnicalQuestions(details: InterviewDetails): PreparationQuestion
         "The role calls for backend ownership, making performance diagnosis and safe production decision-making relevant.",
       approach: ["Establish symptoms and impact", "Use traces and saturation metrics", "Test competing hypotheses", "Validate a safe change"],
       followUp: "Which signal would help you distinguish database saturation from application-level contention?",
+      evidence: [],
+      specificity: "Vacancy",
     });
   }
 
@@ -120,6 +143,8 @@ function buildTechnicalQuestions(details: InterviewDetails): PreparationQuestion
         "Production and deployment requirements usually lead to questions about observability, rollout controls, and operational ownership.",
       approach: ["Describe the release path", "Define service-level signals", "Limit blast radius", "Explain rollback criteria"],
       followUp: "What would make you stop or roll back the deployment?",
+      evidence: [],
+      specificity: "Vacancy",
     });
   }
 
@@ -134,6 +159,8 @@ function buildTechnicalQuestions(details: InterviewDetails): PreparationQuestion
           "The question tests whether you can connect technical choices to constraints instead of presenting one solution as universally correct.",
         approach: ["State the decision", "Name the constraints", "Compare credible options", "Explain the measured outcome"],
         followUp: "What new information would cause you to reverse that decision?",
+        evidence: [],
+        specificity: "Role pattern",
       },
       {
         id: "failure-analysis",
@@ -144,6 +171,8 @@ function buildTechnicalQuestions(details: InterviewDetails): PreparationQuestion
           "Operational judgment is a common signal for roles that own production systems, particularly in regulated or high-availability environments.",
         approach: ["Protect customers", "Assign ownership", "Gather high-signal evidence", "Communicate and recover"],
         followUp: "How would you keep the incident response moving when the root cause is still unclear?",
+        evidence: [],
+        specificity: "Role pattern",
       },
     );
   }
@@ -163,6 +192,8 @@ function buildQuestions(details: InterviewDetails): PreparationQuestion[] {
             "Interviewers commonly test the strongest role-relevant claim in a CV and clarify the candidate's individual contribution.",
           approach: ["Set the project context", "Make your ownership explicit", "Explain one key decision", "Quantify the result"],
           followUp: "Which part of that outcome can be attributed specifically to your decisions?",
+          evidence: [],
+          specificity: "Role pattern",
         },
         {
           id: "cv-depth",
@@ -173,6 +204,8 @@ function buildQuestions(details: InterviewDetails): PreparationQuestion[] {
             "This explores depth behind written claims without assuming details that have not been verified from the uploaded file.",
           approach: ["Name the claim", "Describe the real constraint", "Explain the hard part", "Share what changed in your approach"],
           followUp: "What evidence did you use to know the solution was working?",
+          evidence: [],
+          specificity: "Role pattern",
         },
       ]
     : [];
@@ -188,6 +221,8 @@ function buildQuestions(details: InterviewDetails): PreparationQuestion[] {
         "A concise introduction helps the interviewer connect your background to the role before exploring specific evidence.",
       approach: ["Start with your current focus", "Select two relevant experiences", "Connect them to this role", "Keep the answer concise"],
       followUp: "Which of those experiences best reflects the work you want to do next?",
+      evidence: [],
+      specificity: "Role pattern",
     },
     {
       id: "company-motivation",
@@ -198,6 +233,8 @@ function buildQuestions(details: InterviewDetails): PreparationQuestion[] {
         "Motivation and company fit are commonly explored, but the answer should rely on facts you have personally verified.",
       approach: ["Name a verified company reason", "Connect it to the role", "Explain your contribution", "Avoid generic praise"],
       followUp: "What would make this role a meaningful next step for you?",
+      evidence: [],
+      specificity: "Role pattern",
     },
     {
       id: "behavioral-conflict",
@@ -208,6 +245,8 @@ function buildQuestions(details: InterviewDetails): PreparationQuestion[] {
         "The question tests collaboration, evidence-based decision-making, and ownership rather than technical knowledge alone.",
       approach: ["Give the situation", "Explain the competing views", "Show your action", "End with the result and lesson"],
       followUp: "What would you do differently if the same disagreement happened now?",
+      evidence: [],
+      specificity: "Role pattern",
     },
   ];
 
@@ -313,6 +352,9 @@ function buildLocalAnalysis(details: InterviewDetails): InterviewAnalysis {
     companyCoverage: "Limited",
     companyCoverageNote:
       "Public interview information for this company is limited. Questions are weighted more heavily toward the vacancy, role, industry and your CV.",
+    analysisMode: "local_preview",
+    researchSources: [],
+    companySignals: [],
     focusAreas: focusAreas.slice(0, 5),
     cvAreas: details.cvFileName
       ? [
@@ -329,21 +371,32 @@ export async function prepareInterview(
   details: InterviewDetails,
   onStep: (stepIndex: number) => void,
 ): Promise<InterviewAnalysis> {
-  if (API_BASE_URL) {
-    const response = await fetch(`${API_BASE_URL}/api/v1/interview-preparations/analyze`, {
+  const endpoint = API_BASE_URL
+    ? `${API_BASE_URL}/api/v1/interview-preparations/analyze`
+    : "/api/interview-preparations/analyze";
+
+  for (let index = 0; index < analysisSteps.length - 1; index += 1) {
+    onStep(index);
+    await wait(160);
+  }
+  onStep(analysisSteps.length - 1);
+
+  try {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(details),
     });
-    if (!response.ok) {
+    if (response.ok) {
+      return (await response.json()) as InterviewAnalysis;
+    }
+    if (API_BASE_URL) {
       throw new Error("We could not prepare this interview. Please check the details and try again.");
     }
-    return (await response.json()) as InterviewAnalysis;
+  } catch (error) {
+    if (API_BASE_URL) throw error;
   }
 
-  for (let index = 0; index < analysisSteps.length; index += 1) {
-    onStep(index);
-    await wait(index === analysisSteps.length - 1 ? 360 : 240);
-  }
+  await wait(240);
   return buildLocalAnalysis(details);
 }

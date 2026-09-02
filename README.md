@@ -31,12 +31,14 @@ For a single detailed account of everything implemented from the beginning, see 
 
 ## Frontend MVP demo
 
-An English, responsive product demo is available in [`frontend`](frontend/README.md).
+A bilingual English/Azerbaijani responsive product demo is available in [`frontend`](frontend/README.md).
 It implements the focused candidate journey: one interview-details form, transparent
 analysis states, an evidence-labeled likely-question sheet, Real Interview and Practice
-modes, relevant follow-ups, and a concise final report. The frontend keeps the pending
-analysis API behind one adapter; without a configured API origin it uses an honest local
-preview path and does not claim to have parsed the CV or found private company questions.
+modes, relevant follow-ups, and a concise final report. Its same-origin demo analysis
+route can use OpenAI web search to build company-grounded likely questions from public
+sources and exposes those sources beside the result. If live research is not configured
+or fails, the interface explicitly falls back to a vacancy/role preview and does not
+present those questions as company-specific or as leaked, exact interview questions.
 
 ```powershell
 cd frontend
