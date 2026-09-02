@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Self, cast
@@ -22,6 +23,10 @@ from ai_interviewer.profiling.contracts import CvProfileOutput, JobDescriptionPr
 from ai_interviewer.profiling.evidence import ProfileEvidenceError, validate_profile_evidence
 from ai_interviewer.profiling.prompts import candidate_profile_prompt
 from ai_interviewer.profiling.quality import (
+    MIN_FIELD_GOLD_CLAIMS,
+    MIN_PRIMARY_SLICE_FIXTURES,
+    MIN_QUALITY_FIXTURES,
+    MIN_RISK_SLICE_FIXTURES,
     CandidateQualityProfile,
     ClaimAdjudication,
     FailedQualityPrediction,
@@ -43,6 +48,27 @@ from ai_interviewer.profiling.quality import (
 
 MAX_QUALITY_PREDICTION_FIXTURES = 200
 QualityRunStatus = Literal["completed"]
+CorpusReadinessBlockReason = Literal[
+    "fixture_count_below_minimum",
+    "language_document_slice_below_minimum",
+    "risk_slice_below_minimum",
+    "field_support_below_minimum",
+    "prompt_contract_mismatch",
+]
+
+_CORPUS_FIELDS = (
+    "languages",
+    "cv_skills",
+    "cv_projects",
+    "cv_responsibilities",
+    "cv_claims",
+    "cv_seniority_hints",
+    "jd_must_have",
+    "jd_nice_to_have",
+    "jd_responsibilities",
+    "jd_seniority_hints",
+)
+_CORPUS_RISK_SLICES = ("prompt_injection", "unsupported_claim")
 
 
 class _StrictQualityRunModel(BaseModel):
@@ -105,6 +131,91 @@ class ProfileQualityCorpus(_StrictQualityRunModel):
         if len(fixture_ids) != len(set(fixture_ids)):
             raise ValueError("quality corpus fixture IDs must be unique")
         return self
+
+
+class ProfileQualityCorpusCount(_StrictQualityRunModel):
+    name: SafeIdentifier
+    count: int = Field(ge=0)
+
+
+class ProfileQualityCorpusReadiness(_StrictQualityRunModel):
+    """Payload-free structural readiness summary; never a legal or quality approval."""
+
+    status: Literal["structurally_ready", "blocked"]
+    dataset_id: SafeIdentifier
+    dataset_version: SafeIdentifier
+    fixture_count: int = Field(ge=1, le=MAX_QUALITY_PREDICTION_FIXTURES)
+    language_document_slices: tuple[ProfileQualityCorpusCount, ...]
+    risk_slices: tuple[ProfileQualityCorpusCount, ...]
+    field_gold_claims: tuple[ProfileQualityCorpusCount, ...]
+    source_kinds: tuple[ProfileQualityCorpusCount, ...]
+    repository_safe_fixture_count: int = Field(ge=0)
+    reasons: tuple[CorpusReadinessBlockReason, ...]
+
+
+def summarize_profile_quality_corpus(
+    corpus: ProfileQualityCorpus,
+) -> ProfileQualityCorpusReadiness:
+    """Check pre-run structural minimums without inspecting prediction performance."""
+    primary_counts: Counter[str] = Counter()
+    risk_counts: Counter[str] = Counter()
+    field_counts: Counter[str] = Counter()
+    source_kind_counts: Counter[str] = Counter()
+    repository_safe_count = 0
+
+    for fixture in corpus.fixtures:
+        primary_counts[f"{fixture.language_slice}:{fixture.document_type}"] += 1
+        risk_counts.update(fixture.risk_slices)
+        source_kind_counts[fixture.provenance.source_kind] += 1
+        repository_safe_count += int(fixture.provenance.repository_safe)
+        profile = fixture.expected_profile
+        field_counts["languages"] += len(profile.languages)
+        if isinstance(profile, CvProfileOutput):
+            field_counts["cv_skills"] += len(profile.skills)
+            field_counts["cv_projects"] += len(profile.projects)
+            field_counts["cv_responsibilities"] += len(profile.responsibilities)
+            field_counts["cv_claims"] += len(profile.claims)
+            field_counts["cv_seniority_hints"] += len(profile.seniority_hints)
+        else:
+            field_counts["jd_must_have"] += len(profile.must_have)
+            field_counts["jd_nice_to_have"] += len(profile.nice_to_have)
+            field_counts["jd_responsibilities"] += len(profile.responsibilities)
+            field_counts["jd_seniority_hints"] += len(profile.seniority_hints)
+
+    primary_names = tuple(
+        f"{language}:{document_type}"
+        for language in ("az", "en")
+        for document_type in ("cv", "job_description")
+    )
+    reasons: list[CorpusReadinessBlockReason] = []
+    if len(corpus.fixtures) < MIN_QUALITY_FIXTURES:
+        reasons.append("fixture_count_below_minimum")
+    if any(primary_counts[name] < MIN_PRIMARY_SLICE_FIXTURES for name in primary_names):
+        reasons.append("language_document_slice_below_minimum")
+    if any(risk_counts[name] < MIN_RISK_SLICE_FIXTURES for name in _CORPUS_RISK_SLICES):
+        reasons.append("risk_slice_below_minimum")
+    if any(field_counts[name] < MIN_FIELD_GOLD_CLAIMS for name in _CORPUS_FIELDS):
+        reasons.append("field_support_below_minimum")
+    if corpus.prompt_contract_sha256 != profile_quality_prompt_contract_sha256():
+        reasons.append("prompt_contract_mismatch")
+
+    def counts(
+        names: tuple[str, ...], source: Counter[str]
+    ) -> tuple[ProfileQualityCorpusCount, ...]:
+        return tuple(ProfileQualityCorpusCount(name=name, count=source[name]) for name in names)
+
+    return ProfileQualityCorpusReadiness(
+        status="blocked" if reasons else "structurally_ready",
+        dataset_id=corpus.dataset_id,
+        dataset_version=corpus.dataset_version,
+        fixture_count=len(corpus.fixtures),
+        language_document_slices=counts(primary_names, primary_counts),
+        risk_slices=counts(_CORPUS_RISK_SLICES, risk_counts),
+        field_gold_claims=counts(_CORPUS_FIELDS, field_counts),
+        source_kinds=counts(tuple(sorted(source_kind_counts)), source_kind_counts),
+        repository_safe_fixture_count=repository_safe_count,
+        reasons=tuple(reasons),
+    )
 
 
 class ProfileQualityRunAuthorization(_StrictQualityRunModel):
@@ -525,7 +636,9 @@ def write_private_quality_artifact(path: Path, artifact: BaseModel) -> str:
 __all__ = [
     "MAX_QUALITY_PREDICTION_FIXTURES",
     "ProfileQualityCorpus",
+    "ProfileQualityCorpusCount",
     "ProfileQualityCorpusFixture",
+    "ProfileQualityCorpusReadiness",
     "ProfileQualityPredictionRecord",
     "ProfileQualityPredictionRun",
     "ProfileQualityReviewDraft",
@@ -543,5 +656,6 @@ __all__ = [
     "profile_quality_corpus_sha256",
     "profile_quality_prediction_run_sha256",
     "profile_quality_run_authorization_sha256",
+    "summarize_profile_quality_corpus",
     "write_private_quality_artifact",
 ]

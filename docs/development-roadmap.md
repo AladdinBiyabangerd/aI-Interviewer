@@ -196,7 +196,9 @@ Delivery inside 1B is gated further:
       adjudication and owner-review outcomes; recorded slice/error analysis; all
       thresholds met; four named approvals bound to the exact evidence digest. Product
        activation and production deployment of the disabled-by-default supervisor remain
-       separate reviewed decisions.
+       separate reviewed decisions. Preparation now includes an O*NET-derived 40-fixture
+       synthetic AZ/EN development corpus and a payload-free structural-readiness command;
+       neither substitutes for real-document validation or named approval.
 
 #### 1C. Baseline interview blueprint
 

@@ -2,9 +2,9 @@
 
 This document owns the deterministic Phase 1B-D quality contract for evidence-linked
 CV and job-description profiles. The repository currently implements the D1 evaluator
-and synthetic seed, the D2.2a explicitly authorized prediction runner, and the D2.2b1
-exact human-review finalizer. It does not contain a real corpus and does not claim that
-a real model release has passed D2.
+and synthetic seed, the D2.2a explicitly authorized prediction runner, the D2.2b1 exact
+human-review finalizer, and an O*NET-derived 40-fixture synthetic development corpus. It
+does not contain a real corpus and does not claim that a real model release has passed D2.
 
 ## Inputs and trust boundary
 
@@ -116,6 +116,8 @@ only when the evaluation is eligible and every required approval matches.
 
 ```powershell
 uv run ai-interviewer-profile-quality prompt-digest
+uv run ai-interviewer-profile-quality build-development-corpus <output.json>
+uv run ai-interviewer-profile-quality validate-corpus <corpus.json>
 uv run ai-interviewer-profile-quality schema corpus
 uv run ai-interviewer-profile-quality schema authorization
 uv run ai-interviewer-profile-quality schema predictions
@@ -129,6 +131,13 @@ uv run ai-interviewer-profile-quality finalize-review <corpus.json> <predictions
 uv run ai-interviewer-profile-quality evaluate <quality-evidence.json>
 uv run ai-interviewer-profile-quality gate <quality-evidence.json> <approval.json>
 ```
+
+`build-development-corpus` creates the checked-in, repository-safe O*NET-derived
+benchmark. `validate-corpus` reports payload-free fixture, primary-slice, risk-slice, and
+gold-field support counts. `structurally_ready` means only that the pre-run numeric and
+prompt-digest minimums are present; it is not corpus-rights approval, model-quality
+evidence, or authorization to send any document to a provider. See the
+[development corpus preparation record](../status/phase-1b-d2-development-corpus.md).
 
 `preflight` performs the complete corpus/prompt/digest/active-window authorization check
 without constructing a provider gateway, reading a credential, or making an external
