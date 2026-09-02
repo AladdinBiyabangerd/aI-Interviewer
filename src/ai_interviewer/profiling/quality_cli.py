@@ -14,6 +14,10 @@ from pydantic import BaseModel, ValidationError
 
 from ai_interviewer.core.config import Settings
 from ai_interviewer.model_gateway import ModelGatewayRuntime, build_model_gateway
+from ai_interviewer.profiling.development_corpus import (
+    build_development_profile_corpus,
+    development_corpus_source_coordinates,
+)
 from ai_interviewer.profiling.quality import (
     ProfileQualityApproval,
     ProfileQualityEvidence,
@@ -38,6 +42,7 @@ from ai_interviewer.profiling.quality_run import (
     preflight_profile_quality_run,
     prepare_profile_quality_review_draft,
     profile_quality_prediction_run_sha256,
+    summarize_profile_quality_corpus,
     write_private_quality_artifact,
 )
 
@@ -80,6 +85,16 @@ def _parser() -> argparse.ArgumentParser:
     )
     preflight.add_argument("corpus", type=Path)
     preflight.add_argument("authorization", type=Path)
+    validate_corpus = subcommands.add_parser(
+        "validate-corpus",
+        help="report payload-free corpus structural readiness without granting approval",
+    )
+    validate_corpus.add_argument("corpus", type=Path)
+    development_corpus = subcommands.add_parser(
+        "build-development-corpus",
+        help="create the repository-safe O*NET-derived development corpus",
+    )
+    development_corpus.add_argument("output", type=Path)
     review = subcommands.add_parser(
         "prepare-review",
         help="join corpus and predictions into an unadjudicated private draft",
@@ -131,6 +146,29 @@ def main(
         print(profile_quality_prompt_contract_sha256())
         return 0
     try:
+        if args.command == "build-development-corpus":
+            _require_new_output_path(args.output)
+            corpus = build_development_profile_corpus()
+            artifact_digest = write_private_quality_artifact(args.output, corpus)
+            corpus_summary = summarize_profile_quality_corpus(corpus)
+            print(
+                json.dumps(
+                    {
+                        "artifact_sha256": artifact_digest,
+                        "fixture_count": corpus_summary.fixture_count,
+                        "source_coordinate_count": len(development_corpus_source_coordinates()),
+                        "status": "development_corpus_created",
+                        "structural_status": corpus_summary.status,
+                    },
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "validate-corpus":
+            corpus = load_profile_quality_corpus(args.corpus)
+            corpus_summary = summarize_profile_quality_corpus(corpus)
+            print(json.dumps(corpus_summary.model_dump(mode="json"), sort_keys=True))
+            return 0 if corpus_summary.status == "structurally_ready" else 3
         if args.command == "preflight":
             corpus = load_profile_quality_corpus(args.corpus)
             authorization = load_profile_quality_run_authorization(args.authorization)
