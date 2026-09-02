@@ -48,3 +48,18 @@ test("keeps the complete interview journey and backend boundary in focused modul
   assert.match(api, /companyCoverage: "Limited"/);
   assert.doesNotMatch(page, /avatar|camera|video interview|chat bubble/i);
 });
+
+test("keeps professional desktop scale without changing the responsive flow", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(css, /--app-width:\s*1240px/);
+  assert.match(css, /--form-width:\s*1160px/);
+  assert.match(css, /--content-width:\s*1180px/);
+  assert.match(css, /\.header-inner\s*{[^}]*min-height:\s*68px/s);
+  assert.match(css, /\.home-intro h1\s*{[^}]*44px/s);
+  assert.match(css, /\.interview-form input, \.interview-form select\s*{[^}]*height:\s*50px/s);
+  assert.match(css, /\.important-field textarea\s*{[^}]*min-height:\s*240px/s);
+  assert.match(css, /\.upload-field\s*{[^}]*min-height:\s*144px/s);
+  assert.match(css, /@media \(max-width:\s*760px\)/);
+});
