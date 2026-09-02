@@ -87,38 +87,122 @@ function Header({
 
 function Home({ recent, onStart, onOpen }: { recent: InterviewAnalysis | null; onStart: () => void; onOpen: () => void }) {
   return (
-    <main className="page home-page">
-      <section className="home-intro">
-        <p className="eyebrow">Interview preparation</p>
-        <h1>Prepare for your interview</h1>
-        <p className="home-copy">
-          Tell us where you&apos;re interviewing, paste the job requirements, and optionally add your CV.
-          We&apos;ll prepare questions tailored to the role and interview.
-        </p>
-        <button className="button button-primary" onClick={onStart} type="button">
-          Prepare for an Interview <span aria-hidden="true">→</span>
-        </button>
-        <p className="home-note">No account required for this product preview.</p>
-      </section>
-
-      {recent ? (
-        <section className="recent-section" aria-labelledby="recent-title">
-          <div className="section-heading compact-heading">
-            <div><p className="eyebrow">Recent</p><h2 id="recent-title">Continue preparing</h2></div>
+    <>
+      <main className="page home-page">
+        <section className="home-hero" aria-labelledby="home-title">
+          <div className="home-intro">
+            <p className="eyebrow">Interview preparation</p>
+            <h1 id="home-title">Prepare for the interview you&apos;re actually going to have.</h1>
+            <p className="home-copy">
+              Paste the vacancy, tell us the company and role, and optionally add your CV. We&apos;ll identify
+              the questions worth preparing and let you practise them in a realistic interview.
+            </p>
+            <button className="button button-primary" onClick={onStart} type="button">
+              Prepare for an Interview <span aria-hidden="true">→</span>
+            </button>
+            <p className="home-note">No account required for this product preview.</p>
           </div>
-          <button className="recent-row" type="button" onClick={onOpen}>
-            <span><strong>{recent.details.company}</strong><small>{recent.details.role}</small></span>
-            <span><small>{recent.details.stage}</small><strong aria-hidden="true">→</strong></span>
-          </button>
+
+          <aside className="product-preview" aria-label="Example interview preparation result">
+            <div className="preview-header">
+              <div>
+                <p>Interview preparation</p>
+                <h2>PASHA Bank</h2>
+                <span>AI Engineer</span>
+              </div>
+              <strong>Technical Interview</strong>
+            </div>
+
+            <section className="preview-section" aria-labelledby="preview-sources-title">
+              <h3 id="preview-sources-title">Preparation sources</h3>
+              <dl className="preview-rows">
+                <div><dt>Job requirements</dt><dd>Included</dd></div>
+                <div><dt>CV</dt><dd>Included</dd></div>
+                <div><dt>Company signals</dt><dd>Available</dd></div>
+              </dl>
+            </section>
+
+            <section className="preview-section" aria-labelledby="preview-focus-title">
+              <h3 id="preview-focus-title">Likely focus areas</h3>
+              <dl className="preview-rows">
+                <div><dt>RAG &amp; LLM Systems</dt><dd>High</dd></div>
+                <div><dt>Python</dt><dd>High</dd></div>
+                <div><dt>ML Fundamentals</dt><dd>High</dd></div>
+                <div><dt>Deployment</dt><dd>Medium</dd></div>
+              </dl>
+            </section>
+
+            <section className="preview-question" aria-labelledby="preview-question-title">
+              <div><strong>34 likely questions</strong><span>Example question</span></div>
+              <p id="preview-question-title">How would you evaluate retrieval quality independently from the final LLM response?</p>
+              <span className="source-tag">Job Description</span>
+            </section>
+          </aside>
         </section>
-      ) : (
-        <section className="process-strip" aria-label="How interview preparation works">
-          <div><span>01</span><p><strong>Add the interview details</strong><small>Company, role and vacancy requirements.</small></p></div>
-          <div><span>02</span><p><strong>Review likely questions</strong><small>See what to prepare and why it matters.</small></p></div>
-          <div><span>03</span><p><strong>Practice when you are ready</strong><small>Answer in a focused interview setting.</small></p></div>
+
+        <section className="home-benefits" aria-labelledby="benefits-title">
+          <div className="home-section-heading">
+            <div><p className="eyebrow">One preparation</p><h2 id="benefits-title">What you get from one preparation</h2></div>
+            <p>One setup gives you both a focused question set and a realistic interview practice session.</p>
+          </div>
+          <div className="benefit-grid">
+            <article><span>01</span><h3>Questions tailored to the vacancy</h3><p>The role requirements are broken into the areas an interviewer is most likely to test.</p></article>
+            <article><span>02</span><h3>Questions from your CV</h3><p>Projects, technologies and claims in your CV become realistic interviewer follow-ups.</p></article>
+            <article><span>03</span><h3>Practice the interview</h3><p>Answer selected questions and continue with follow-ups based on your responses.</p></article>
+          </div>
         </section>
-      )}
-    </main>
+
+        <section className="personalization-section" aria-labelledby="personalization-title">
+          <div className="home-section-heading">
+            <div><p className="eyebrow">Personalised preparation</p><h2 id="personalization-title">Built around the interview you&apos;re applying for</h2></div>
+            <p>Vacancy requirements and CV evidence are connected before questions are selected.</p>
+          </div>
+          <div className="personalization-example">
+            <div className="signal-column">
+              <div className="signal-group">
+                <h3>AI Engineer vacancy</h3>
+                <ul><li>Python</li><li>RAG</li><li>LLM evaluation</li><li>Docker</li><li>Production ML</li></ul>
+              </div>
+              <div className="signal-group">
+                <h3>CV signals</h3>
+                <ul><li>Built a RAG platform</li><li>Worked with FAISS</li><li>Deployed using Docker</li></ul>
+              </div>
+            </div>
+            <div className="example-flow" aria-hidden="true"><span>→</span></div>
+            <div className="resulting-questions">
+              <h3>Likely questions</h3>
+              <ol>
+                <li>How did you evaluate your RAG retrieval?</li>
+                <li>Why did you choose FAISS?</li>
+                <li>How did you monitor the system in production?</li>
+                <li>What failure cases did you encounter?</li>
+              </ol>
+            </div>
+          </div>
+        </section>
+
+        {recent ? (
+          <section className="recent-section" aria-labelledby="recent-title">
+            <div className="section-heading compact-heading">
+              <div><p className="eyebrow">Recent</p><h2 id="recent-title">Continue preparing</h2></div>
+            </div>
+            <button className="recent-row" type="button" onClick={onOpen}>
+              <span><strong>{recent.details.company}</strong><small>{recent.details.role}</small></span>
+              <span><small>{recent.details.stage}</small><strong aria-hidden="true">→</strong></span>
+            </button>
+          </section>
+        ) : null}
+
+        <section className="home-final-cta" aria-labelledby="home-cta-title">
+          <div><p className="eyebrow">Ready when you are</p><h2 id="home-cta-title">Prepare for your interview.</h2><p>Add the role and vacancy. Your likely questions will be ready in one focused preparation.</p></div>
+          <button className="button button-primary" onClick={onStart} type="button">Start a Preparation <span aria-hidden="true">→</span></button>
+        </section>
+      </main>
+
+      <footer className="home-footer">
+        <div><strong>Interview Prep</strong><span>Focused preparation for specific roles and vacancies.</span></div>
+      </footer>
+    </>
   );
 }
 

@@ -15,11 +15,14 @@ test("server-renders the focused English interview preparation entry point", asy
   const html = await response.text();
   assert.match(html, /<html lang="en">/i);
   assert.match(html, /Interview Prep — Prepare for the questions that matter/i);
-  assert.match(html, /Prepare for your interview/);
+  assert.match(html, /Prepare for the interview/);
   assert.match(html, /Prepare for an Interview/);
-  assert.match(html, /Add the interview details/);
-  assert.match(html, /Review likely questions/);
-  assert.match(html, /Practice when you are ready/);
+  assert.match(html, /PASHA Bank/);
+  assert.match(html, /RAG &amp; LLM Systems/);
+  assert.match(html, /What you get from one preparation/);
+  assert.match(html, /Questions tailored to the vacancy/);
+  assert.match(html, /Built around the interview/);
+  assert.match(html, /How did you evaluate your RAG retrieval/);
   assert.match(html, /og\.png/);
   assert.doesNotMatch(html, /AI-assisted demo|AI Magic|Start AI|analytics/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
@@ -57,7 +60,8 @@ test("keeps professional desktop scale without changing the responsive flow", as
   assert.match(css, /--form-width:\s*1160px/);
   assert.match(css, /--content-width:\s*1180px/);
   assert.match(css, /\.header-inner\s*{[^}]*min-height:\s*68px/s);
-  assert.match(css, /\.home-intro h1\s*{[^}]*44px/s);
+  assert.match(css, /\.home-hero\s*{[^}]*grid-template-columns:\s*minmax\(0, 1\.04fr\)/s);
+  assert.match(css, /\.home-intro h1\s*{[^}]*48px/s);
   assert.match(css, /\.interview-form input, \.interview-form select\s*{[^}]*height:\s*50px/s);
   assert.match(css, /\.important-field textarea\s*{[^}]*min-height:\s*240px/s);
   assert.match(css, /\.upload-field\s*{[^}]*min-height:\s*144px/s);
