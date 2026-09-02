@@ -18,5 +18,8 @@ test("server-renders the English interview MVP", async () => {
   assert.match(html, /Prepare for the interview/);
   assert.match(html, /Start demo interview/);
   assert.match(html, /Demo mode/);
+  assert.match(html, /Kapital Bank/);
+  assert.match(html, /Senior Backend Developer/);
+  assert.match(html, /og-demo-v2\.png/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
