@@ -42,18 +42,18 @@ const interviewQuestions = [
 ];
 
 const navItems: { id: View; label: string; glyph: string }[] = [
-  { id: "dashboard", label: "Dashboard", glyph: "⌂" },
-  { id: "setup", label: "New preparation", glyph: "+" },
-  { id: "profile", label: "AI profile", glyph: "◫" },
-  { id: "interview", label: "Interview", glyph: "◎" },
-  { id: "report", label: "Reports", glyph: "↗" },
+  { id: "dashboard", label: "Overview", glyph: "01" },
+  { id: "setup", label: "New preparation", glyph: "02" },
+  { id: "profile", label: "Candidate brief", glyph: "03" },
+  { id: "interview", label: "Practice room", glyph: "04" },
+  { id: "report", label: "Review", glyph: "05" },
 ];
 
 function Brand() {
   return (
-    <div className="brand" aria-label="Interview AI">
-      <span className="brand-mark" aria-hidden="true">I</span>
-      <span><strong>Interview</strong><small>AI preparation platform</small></span>
+    <div className="brand" aria-label="Interview OS">
+      <span className="brand-mark" aria-hidden="true">IO</span>
+      <span><strong>InterviewOS</strong><small>Preparation workspace</small></span>
     </div>
   );
 }
@@ -72,8 +72,8 @@ function Sidebar({ view, onNavigate }: { view: View; onNavigate: (view: View) =>
       </nav>
       <div className="sidebar-bottom">
         <div className="plan-card">
-          <span className="tiny-label">BETA ACCESS</span><strong>Professional plan</strong>
-          <p>7 practice sessions left this month</p><div className="plan-progress"><span /></div>
+          <span className="tiny-label">DEMO WORKSPACE</span><strong>Product walkthrough</strong>
+          <p>All information shown here is synthetic.</p><div className="plan-progress"><span /></div>
         </div>
         <button className="profile-chip" type="button">
           <span className="avatar">EM</span><span><strong>Elvin Mammadov</strong><small>Senior Backend</small></span><b aria-hidden="true">•••</b>
@@ -87,15 +87,15 @@ function Topbar({ view }: { view: View }) {
   const titles: Record<View, string> = {
     dashboard: "Preparation hub",
     setup: "New preparation",
-    profile: "AI candidate profile",
-    interview: "Interview simulation",
+    profile: "Candidate brief",
+    interview: "Practice session",
     report: "Performance report",
   };
   return (
     <header className="topbar">
       <div className="mobile-brand"><Brand /></div>
       <div><span className="breadcrumb">Workspace /</span> {titles[view]}</div>
-      <div className="top-actions"><span className="demo-pill"><i /> Demo mode</span><button className="round-button" aria-label="Notifications" type="button">•</button></div>
+      <div className="top-actions"><span className="demo-pill"><i /> Guided demo</span><button className="round-button" aria-label="Help" type="button">?</button></div>
     </header>
   );
 }
@@ -105,26 +105,25 @@ function Dashboard({ onStart }: { onStart: () => void }) {
     <div className="screen dashboard-screen">
       <section className="hero-grid">
         <div className="hero-copy">
-          <span className="eyebrow"><i /> Your personal AI interview coach</span>
-          <h1>Prepare for the interview.<br /><em>With confidence.</em></h1>
-          <p>Tailored questions based on your resume and target role, a realistic simulation, and a focused improvement plan.</p>
-          <div className="hero-actions"><button className="primary-button" onClick={onStart} type="button">Start demo interview <span>→</span></button><span className="privacy-note"><b>✓</b> No card required</span></div>
-          <div className="hero-proof"><div className="avatar-stack"><span>AY</span><span>NM</span><span>SA</span><span>+</span></div><p><strong>1,200+</strong> candidates already feel more prepared</p></div>
+          <span className="eyebrow">Structured interview preparation</span>
+          <h1>Walk into the interview <em>prepared.</em></h1>
+          <p>Turn a resume and job description into a focused practice session, evidence-based feedback, and a clear plan for improvement.</p>
+          <div className="hero-actions"><button className="primary-button" onClick={onStart} type="button">Start product walkthrough <span>→</span></button><span className="privacy-note">Takes about 3 minutes</span></div>
+          <div className="hero-proof"><span>Resume evidence</span><span>Role-specific questions</span><span>Detailed review</span></div>
         </div>
         <div className="session-visual">
-          <div className="visual-orbit orbit-one" /><div className="visual-orbit orbit-two" />
-          <div className="visual-topline"><span><i /> Next session</span><b>Today, 6:30 PM</b></div>
-          <div className="interviewer-orb"><span>AI</span><i /></div>
-          <span className="visual-kicker">TECHNICAL INTERVIEW</span><h2>Senior Backend Developer</h2><p>Kapital Bank · 45 min · 12 questions</p>
-          <div className="question-preview"><span>01</span><p>“How do you protect system performance under heavy load?”</p></div>
-          <button onClick={onStart} type="button">Open session <span>↗</span></button>
+          <div className="visual-topline"><span>INTERVIEW BRIEF</span><b>Ready to practise</b></div>
+          <div className="brief-company"><span>KB</span><p><small>Target company</small><strong>Kapital Bank</strong></p></div>
+          <span className="visual-kicker">TECHNICAL INTERVIEW</span><h2>Senior Backend Developer</h2><p>45 minutes · 12 tailored questions</p>
+          <div className="brief-agenda"><div><span>01</span><p><strong>Technical depth</strong><small>Systems, APIs and data</small></p><b>20 min</b></div><div><span>02</span><p><strong>Decision making</strong><small>Trade-offs and ownership</small></p><b>15 min</b></div><div><span>03</span><p><strong>Your questions</strong><small>Close with confidence</small></p><b>10 min</b></div></div>
+          <button onClick={onStart} type="button">Open preparation <span>→</span></button>
         </div>
       </section>
       <section className="metric-strip" aria-label="Preparation metrics">
-        <div><span className="metric-icon lime">↗</span><p>Readiness score<strong>82%</strong><small>+12% this week</small></p></div>
-        <div><span className="metric-icon mint">✓</span><p>Completed practice<strong>8</strong><small>3 sessions this week</small></p></div>
-        <div><span className="metric-icon sand">◎</span><p>Average answer quality<strong>7.8</strong><small>out of 10</small></p></div>
-        <div><span className="metric-icon blue">◷</span><p>Practice time<strong>4.2 hours</strong><small>Focus: system design</small></p></div>
+        <div><span className="metric-icon">01</span><p>Readiness score<strong>82%</strong><small>Up 12% this week</small></p></div>
+        <div><span className="metric-icon">02</span><p>Completed practice<strong>8</strong><small>3 sessions this week</small></p></div>
+        <div><span className="metric-icon">03</span><p>Answer quality<strong>7.8</strong><small>Average out of 10</small></p></div>
+        <div><span className="metric-icon">04</span><p>Practice time<strong>4.2 h</strong><small>Focus: system design</small></p></div>
       </section>
       <section className="lower-grid">
         <div className="panel recent-panel">
@@ -134,8 +133,8 @@ function Dashboard({ onStart }: { onStart: () => void }) {
           <div className="session-row"><span className="company-logo abb">A</span><p><strong>ABB</strong><small>Backend Engineer · System design</small></p><time>Aug 24, 19:10</time><b className="score good">8.1</b></div>
         </div>
         <div className="panel focus-panel">
-          <div className="panel-heading"><div><span className="section-kicker">AI RECOMMENDATION</span><h3>Focus this week</h3></div><span className="trend">+18%</span></div>
-          <div className="focus-chart"><div className="chart-ring"><strong>68%</strong><small>completed</small></div><ul><li><i className="dot green" />System design <b>82%</b></li><li><i className="dot lime-dot" />Behavioral <b>64%</b></li><li><i className="dot gray" />SQL & data <b>57%</b></li></ul></div>
+          <div className="panel-heading"><div><span className="section-kicker">RECOMMENDED PRACTICE</span><h3>Focus this week</h3></div><span className="trend">68% complete</span></div>
+          <div className="focus-chart"><div className="chart-ring"><strong>68%</strong><small>completed</small></div><ul><li><i className="dot primary-dot" />System design <b>82%</b></li><li><i className="dot warm-dot" />Behavioral <b>64%</b></li><li><i className="dot gray" />SQL & data <b>57%</b></li></ul></div>
           <p className="focus-tip"><b>For today:</b> Practice two questions about cache invalidation.</p>
         </div>
       </section>
@@ -144,7 +143,7 @@ function Dashboard({ onStart }: { onStart: () => void }) {
 }
 
 function StepHeader({ current }: { current: number }) {
-  const steps = ["Details", "AI profile", "Interview", "Report"];
+  const steps = ["Details", "Candidate brief", "Practice", "Review"];
   return <div className="stepper">{steps.map((step, index) => <div className={index + 1 <= current ? "step active" : "step"} key={step}><span>{index + 1 < current ? "✓" : index + 1}</span><b>{step}</b>{index < steps.length - 1 && <i />}</div>)}</div>;
 }
 
@@ -164,7 +163,7 @@ function Setup({ context, onAnalyze }: { context: PreparationContext; onAnalyze:
   return (
     <div className="screen flow-screen">
       <StepHeader current={1} />
-      <div className="flow-heading"><span className="eyebrow"><i /> Ready in 2 minutes</span><h1>Tell us about your target</h1><p>AI will tailor the questions and evaluation to this context.</p></div>
+      <div className="flow-heading"><span className="eyebrow">Preparation details</span><h1>Define the interview</h1><p>We use the role and supporting material to build a relevant practice session.</p></div>
       <div className="setup-grid">
         <section className="form-card">
           <div className="card-number">01</div><div><span className="section-kicker">INTERVIEW CONTEXT</span><h2>Which role are you preparing for?</h2></div>
@@ -174,14 +173,14 @@ function Setup({ context, onAnalyze }: { context: PreparationContext; onAnalyze:
           <label>Interview language<div className="segmented single"><button aria-pressed="true" className="selected" type="button">English demo</button></div></label>
         </section>
         <section className="form-card upload-section">
-          <div className="card-number">02</div><div><span className="section-kicker">DOCUMENTS</span><h2>Add context for the AI</h2></div>
+          <div className="card-number">02</div><div><span className="section-kicker">DOCUMENTS</span><h2>Add supporting material</h2></div>
           <div className="file-card ready"><span className="file-type">PDF</span><p><strong>Elvin_Mammadov_CV.pdf</strong><small>1.8 MB · Resume read successfully</small></p><b>✓</b></div>
           <div className="file-card ready"><span className="file-type jd">JD</span><p><strong>Senior_Backend_JD.pdf</strong><small>846 KB · 12 requirements found</small></p><b>✓</b></div>
           <div className="demo-data-note"><span>DEMO DATA</span><p>Synthetic documents are preloaded so the full product journey can be presented without exposing candidate data.</p></div>
           <div className="security-copy"><b>Your personal data is protected</b><p>Documents are used only for this preparation and are never shared without your permission.</p></div>
         </section>
       </div>
-      <div className="flow-footer" aria-live="polite"><p><b>Ready:</b> {company || "Add a company"} · {role || "Add a role"}</p><button className="primary-button" disabled={analyzing || !isReady} onClick={analyze} type="button">{analyzing ? <><span className="spinner" /> AI is analyzing...</> : <>Start AI analysis <span>→</span></>}</button></div>
+      <div className="flow-footer" aria-live="polite"><p><b>Ready:</b> {company || "Add a company"} · {role || "Add a role"}</p><button className="primary-button" disabled={analyzing || !isReady} onClick={analyze} type="button">{analyzing ? <><span className="spinner" /> Reviewing materials...</> : <>Build interview plan <span>→</span></>}</button></div>
     </div>
   );
 }
@@ -191,7 +190,7 @@ function ProfileView({ context, onStart }: { context: PreparationContext; onStar
     <div className="screen flow-screen">
       <StepHeader current={2} />
       <section className="profile-hero">
-        <div><span className="eyebrow"><i /> Demo analysis complete</span><h1>Your profile is <em>strong</em> for this role.</h1><p>We compared your resume with 12 core requirements for {context.role} at {context.company}. The AI built an interview plan around your strongest evidence and most important gaps.</p></div>
+        <div><span className="eyebrow">Candidate brief complete</span><h1>Your experience aligns well with this role.</h1><p>We compared your resume with 12 core requirements for {context.role} at {context.company}. Your session focuses on the strongest evidence and the gaps most likely to come up.</p></div>
         <div className="match-score"><div><strong>86</strong><span>%</span></div><p>Role match<small>High match</small></p></div>
       </section>
       <div className="profile-grid">
@@ -213,8 +212,8 @@ function Interview({ context, onFinish }: { context: PreparationContext; onFinis
       <StepHeader current={3} />
       <div className="interview-layout">
         <section className="interview-stage">
-          <div className="stage-head"><span className="live-badge"><i /> LIVE SIMULATION</span><span>Question {questionIndex + 1} / {interviewQuestions.length}</span><time>12:48</time></div>
-          <div className="ai-persona"><div className="persona-face"><span>AI</span><i /></div><p><strong>Ava</strong><small>Technical interviewer</small></p></div>
+          <div className="stage-head"><span className="live-badge">PRACTICE SESSION</span><span>Question {questionIndex + 1} / {interviewQuestions.length}</span><time>12:48</time></div>
+          <div className="ai-persona"><div className="persona-face"><span>A</span></div><p><strong>Ava</strong><small>Interview coach</small></p></div>
           <div className="question-card"><span>{current.label}</span><h1>{current.question}</h1><p>{current.hint}</p></div>
           <label className="answer-box"><span>Your answer</span><textarea maxLength={1500} value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Write your answer here or use the guided demo answer..." /><div className="answer-footer"><small>{answer.length} / 1,500 characters</small><div><button className="text-button" onClick={() => setAnswer(current.sampleAnswer)} type="button">Use demo answer</button><button disabled={answer.trim().length < 20} onClick={next} type="button">{questionIndex === interviewQuestions.length - 1 ? "Generate report" : "Submit answer"} <span>→</span></button></div></div></label>
         </section>

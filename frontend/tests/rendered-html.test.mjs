@@ -14,12 +14,12 @@ test("server-renders the English interview MVP", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<html lang="en">/i);
-  assert.match(html, /Interview AI — Prepare with confidence/i);
-  assert.match(html, /Prepare for the interview/);
-  assert.match(html, /Start demo interview/);
-  assert.match(html, /Demo mode/);
+  assert.match(html, /InterviewOS — Structured interview preparation/i);
+  assert.match(html, /Walk into the interview/);
+  assert.match(html, /Start product walkthrough/);
+  assert.match(html, /Guided demo/);
   assert.match(html, /Kapital Bank/);
   assert.match(html, /Senior Backend Developer/);
-  assert.match(html, /og-demo-v2\.png/);
+  assert.match(html, /og-professional-light\.png/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });

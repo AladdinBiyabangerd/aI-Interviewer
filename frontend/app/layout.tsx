@@ -6,9 +6,9 @@ import "./globals.css";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-const title = "Interview AI — Prepare with confidence";
+const title = "InterviewOS — Structured interview preparation";
 const description =
-  "A tailored AI interview simulation, performance feedback, and personal improvement plan based on your resume and target role.";
+  "Turn a resume and job description into a focused practice session, evidence-based feedback, and a clear improvement plan.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -22,12 +22,12 @@ export async function generateMetadata(): Promise<Metadata> {
     ? "https"
     : "http";
   const origin = `${protocol}://${host}`;
-  const image = `${origin}/og-demo-v2.png`;
+  const image = `${origin}/og-professional-light.png`;
   return {
     metadataBase: new URL(origin),
     title,
     description,
-    openGraph: { title, description, images: [{ url: image, width: 1792, height: 917 }] },
+    openGraph: { title, description, images: [{ url: image, width: 1732, height: 909 }] },
     twitter: { card: "summary_large_image", title, description, images: [image] },
   };
 }
