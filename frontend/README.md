@@ -5,6 +5,7 @@ Interactive English MVP for presenting the candidate preparation journey:
 - preparation setup with sample CV and job description;
 - simulated AI profile and role-fit analysis;
 - three-question interview flow;
+- a one-click guided answer path for reliable live presentations;
 - scorecard, strengths, gaps, and a seven-day action plan.
 
 The current frontend deliberately uses synthetic demo data. It does not upload a

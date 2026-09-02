@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     ? "https"
     : "http";
   const origin = `${protocol}://${host}`;
-  const image = `${origin}/og.png`;
+  const image = `${origin}/og-demo-v2.png`;
   return {
     metadataBase: new URL(origin),
     title,

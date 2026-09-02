@@ -4,24 +4,40 @@ import { useState } from "react";
 
 type View = "dashboard" | "setup" | "profile" | "interview" | "report";
 
+type PreparationContext = {
+  company: string;
+  role: string;
+};
+
+const defaultContext: PreparationContext = {
+  company: "Kapital Bank",
+  role: "Senior Backend Developer",
+};
+
 const interviewQuestions = [
   {
     label: "Technical depth",
     question:
       "How would you investigate and optimize an API whose latency increases under heavy traffic?",
     hint: "Think systematically: measurement, bottleneck, solution, and outcome.",
+    sampleAnswer:
+      "I would start with latency percentiles, traces, and saturation metrics to isolate the bottleneck. Then I would reproduce the traffic pattern, test the smallest safe change, and compare p95 latency and error rate before a gradual rollout.",
   },
   {
     label: "Problem solving",
     question:
       "A critical production service has failed unexpectedly. What would you do in the first 30 minutes?",
     hint: "Show how you prioritize, communicate, and approach root-cause analysis.",
+    sampleAnswer:
+      "First I would establish incident ownership, protect customers with a rollback or traffic shift, and communicate a concise status. In parallel, I would use recent deploys, logs, traces, and dependency health to narrow the cause before testing a recovery action.",
   },
   {
     label: "Leadership",
     question:
       "Tell me about a time you resolved a disagreement over a technical decision within your team.",
     hint: "Use the STAR structure: situation, task, action, and result.",
+    sampleAnswer:
+      "During a payment-service redesign, two engineers disagreed about introducing a new queue. I documented the failure modes, facilitated a short design review, and proposed a load test. The evidence helped us choose the simpler option and ship without delaying the release.",
   },
 ];
 
@@ -132,11 +148,19 @@ function StepHeader({ current }: { current: number }) {
   return <div className="stepper">{steps.map((step, index) => <div className={index + 1 <= current ? "step active" : "step"} key={step}><span>{index + 1 < current ? "✓" : index + 1}</span><b>{step}</b>{index < steps.length - 1 && <i />}</div>)}</div>;
 }
 
-function Setup({ onAnalyze }: { onAnalyze: () => void }) {
-  const [company, setCompany] = useState("Kapital Bank");
-  const [role, setRole] = useState("Senior Backend Developer");
+function Setup({ context, onAnalyze }: { context: PreparationContext; onAnalyze: (context: PreparationContext) => void }) {
+  const [company, setCompany] = useState(context.company);
+  const [role, setRole] = useState(context.role);
   const [analyzing, setAnalyzing] = useState(false);
-  function analyze() { setAnalyzing(true); window.setTimeout(onAnalyze, 900); }
+  const isReady = company.trim().length > 1 && role.trim().length > 1;
+  function analyze() {
+    if (!isReady) return;
+    setAnalyzing(true);
+    window.setTimeout(
+      () => onAnalyze({ company: company.trim(), role: role.trim() }),
+      900,
+    );
+  }
   return (
     <div className="screen flow-screen">
       <StepHeader current={1} />
@@ -147,27 +171,27 @@ function Setup({ onAnalyze }: { onAnalyze: () => void }) {
           <label>Company<input value={company} onChange={(event) => setCompany(event.target.value)} /></label>
           <label>Role<input value={role} onChange={(event) => setRole(event.target.value)} /></label>
           <div className="field-pair"><label>Level<select defaultValue="senior"><option value="mid">Mid-level</option><option value="senior">Senior</option><option value="lead">Lead</option></select></label><label>Stage<select defaultValue="technical"><option value="hr">HR screening</option><option value="technical">Technical interview</option><option value="system">System design</option></select></label></div>
-          <label>Interview language<div className="segmented"><button className="selected" type="button">English</button><button type="button">German</button><button type="button">Spanish</button></div></label>
+          <label>Interview language<div className="segmented single"><button aria-pressed="true" className="selected" type="button">English demo</button></div></label>
         </section>
         <section className="form-card upload-section">
           <div className="card-number">02</div><div><span className="section-kicker">DOCUMENTS</span><h2>Add context for the AI</h2></div>
           <div className="file-card ready"><span className="file-type">PDF</span><p><strong>Elvin_Mammadov_CV.pdf</strong><small>1.8 MB · Resume read successfully</small></p><b>✓</b></div>
           <div className="file-card ready"><span className="file-type jd">JD</span><p><strong>Senior_Backend_JD.pdf</strong><small>846 KB · 12 requirements found</small></p><b>✓</b></div>
-          <button className="upload-more" type="button"><span>+</span> Add another document</button>
+          <div className="demo-data-note"><span>DEMO DATA</span><p>Synthetic documents are preloaded so the full product journey can be presented without exposing candidate data.</p></div>
           <div className="security-copy"><b>Your personal data is protected</b><p>Documents are used only for this preparation and are never shared without your permission.</p></div>
         </section>
       </div>
-      <div className="flow-footer"><p><b>Ready:</b> {company} · {role}</p><button className="primary-button" disabled={analyzing} onClick={analyze} type="button">{analyzing ? <><span className="spinner" /> AI is analyzing...</> : <>Start AI analysis <span>→</span></>}</button></div>
+      <div className="flow-footer" aria-live="polite"><p><b>Ready:</b> {company || "Add a company"} · {role || "Add a role"}</p><button className="primary-button" disabled={analyzing || !isReady} onClick={analyze} type="button">{analyzing ? <><span className="spinner" /> AI is analyzing...</> : <>Start AI analysis <span>→</span></>}</button></div>
     </div>
   );
 }
 
-function ProfileView({ onStart }: { onStart: () => void }) {
+function ProfileView({ context, onStart }: { context: PreparationContext; onStart: () => void }) {
   return (
     <div className="screen flow-screen">
       <StepHeader current={2} />
       <section className="profile-hero">
-        <div><span className="eyebrow"><i /> Analysis complete</span><h1>Your profile is <em>strong</em> for this role.</h1><p>We compared your resume with 12 core requirements. The AI built an interview plan around your strongest evidence and most important gaps.</p></div>
+        <div><span className="eyebrow"><i /> Demo analysis complete</span><h1>Your profile is <em>strong</em> for this role.</h1><p>We compared your resume with 12 core requirements for {context.role} at {context.company}. The AI built an interview plan around your strongest evidence and most important gaps.</p></div>
         <div className="match-score"><div><strong>86</strong><span>%</span></div><p>Role match<small>High match</small></p></div>
       </section>
       <div className="profile-grid">
@@ -179,7 +203,7 @@ function ProfileView({ onStart }: { onStart: () => void }) {
   );
 }
 
-function Interview({ onFinish }: { onFinish: () => void }) {
+function Interview({ context, onFinish }: { context: PreparationContext; onFinish: () => void }) {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const current = interviewQuestions[questionIndex];
@@ -192,10 +216,10 @@ function Interview({ onFinish }: { onFinish: () => void }) {
           <div className="stage-head"><span className="live-badge"><i /> LIVE SIMULATION</span><span>Question {questionIndex + 1} / {interviewQuestions.length}</span><time>12:48</time></div>
           <div className="ai-persona"><div className="persona-face"><span>AI</span><i /></div><p><strong>Ava</strong><small>Technical interviewer</small></p></div>
           <div className="question-card"><span>{current.label}</span><h1>{current.question}</h1><p>{current.hint}</p></div>
-          <label className="answer-box"><span>Your answer</span><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Write your answer here..." /><div><small>{answer.length} characters</small><button disabled={answer.trim().length < 20} onClick={next} type="button">{questionIndex === interviewQuestions.length - 1 ? "Generate report" : "Submit answer"} <span>→</span></button></div></label>
+          <label className="answer-box"><span>Your answer</span><textarea maxLength={1500} value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Write your answer here or use the guided demo answer..." /><div className="answer-footer"><small>{answer.length} / 1,500 characters</small><div><button className="text-button" onClick={() => setAnswer(current.sampleAnswer)} type="button">Use demo answer</button><button disabled={answer.trim().length < 20} onClick={next} type="button">{questionIndex === interviewQuestions.length - 1 ? "Generate report" : "Submit answer"} <span>→</span></button></div></div></label>
         </section>
         <aside className="interview-notes">
-          <span className="section-kicker">SESSION PLAN</span><h3>Senior Backend Developer</h3><p>Kapital Bank · Technical stage</p>
+          <span className="section-kicker">SESSION PLAN</span><h3>{context.role}</h3><p>{context.company} · Technical stage</p>
           <div className="mini-progress"><span style={{ width: `${((questionIndex + 1) / interviewQuestions.length) * 100}%` }} /></div>
           <ul><li className="done"><span>✓</span><p>Introduction<small>Completed</small></p></li><li className="active"><span>02</span><p>Technical depth<small>In progress</small></p></li><li><span>03</span><p>System design<small>Up next</small></p></li><li><span>04</span><p>Your questions<small>Later</small></p></li></ul>
           <div className="simulation-note"><strong>Simulation mode</strong><p>Just like a real interview, your score stays hidden while you answer. Detailed feedback appears at the end.</p></div>
@@ -205,11 +229,11 @@ function Interview({ onFinish }: { onFinish: () => void }) {
   );
 }
 
-function Report({ onRestart }: { onRestart: () => void }) {
+function Report({ context, onRestart }: { context: PreparationContext; onRestart: () => void }) {
   return (
     <div className="screen flow-screen report-screen">
       <StepHeader current={4} />
-      <section className="report-hero"><div><span className="eyebrow"><i /> Session complete</span><h1>Strong result, Elvin.</h1><p>Your technical foundation is solid. More specific outcomes and clearer trade-off explanations will take your answers to the next level.</p></div><div className="report-score"><div className="score-ring"><span><strong>82</strong><small>/ 100</small></span></div><p>Interview readiness<b>Ready for interviews</b></p></div></section>
+      <section className="report-hero"><div><span className="eyebrow"><i /> Guided demo complete</span><h1>Strong result, Elvin.</h1><p>Your {context.role} simulation for {context.company} shows a solid technical foundation. More specific outcomes and clearer trade-off explanations will take your answers to the next level.</p></div><div className="report-score"><div className="score-ring"><span><strong>82</strong><small>/ 100</small></span></div><p>Demo readiness score<b>Ready for interviews</b></p></div></section>
       <section className="report-metrics"><div><span>Technical depth</span><strong>8.6</strong><i><b style={{ width: "86%" }} /></i></div><div><span>Structure and clarity</span><strong>7.8</strong><i><b style={{ width: "78%" }} /></i></div><div><span>Example quality</span><strong>7.2</strong><i><b style={{ width: "72%" }} /></i></div><div><span>Communication</span><strong>8.4</strong><i><b style={{ width: "84%" }} /></i></div></section>
       <div className="report-grid">
         <section className="panel feedback-card positive"><span className="feedback-icon">✓</span><div><span className="section-kicker">STRENGTHS</span><h3>What you did well</h3><ul><li>Broke the problem into measurable stages</li><li>Prioritized observability and database bottlenecks correctly</li><li>Took a practical approach to team communication</li></ul></div></section>
@@ -222,15 +246,20 @@ function Report({ onRestart }: { onRestart: () => void }) {
 
 export default function Home() {
   const [view, setView] = useState<View>("dashboard");
+  const [context, setContext] = useState<PreparationContext>(defaultContext);
+  function completeAnalysis(nextContext: PreparationContext) {
+    setContext(nextContext);
+    setView("profile");
+  }
   return (
     <main className="app-shell">
       <Sidebar view={view} onNavigate={setView} />
       <div className="app-main"><Topbar view={view} />
         {view === "dashboard" && <Dashboard onStart={() => setView("setup")} />}
-        {view === "setup" && <Setup onAnalyze={() => setView("profile")} />}
-        {view === "profile" && <ProfileView onStart={() => setView("interview")} />}
-        {view === "interview" && <Interview onFinish={() => setView("report")} />}
-        {view === "report" && <Report onRestart={() => setView("setup")} />}
+        {view === "setup" && <Setup context={context} onAnalyze={completeAnalysis} />}
+        {view === "profile" && <ProfileView context={context} onStart={() => setView("interview")} />}
+        {view === "interview" && <Interview context={context} onFinish={() => setView("report")} />}
+        {view === "report" && <Report context={context} onRestart={() => setView("setup")} />}
       </div>
     </main>
   );
