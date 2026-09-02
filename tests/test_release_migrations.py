@@ -35,6 +35,12 @@ def test_migration_settings_are_narrow_and_validate_database_url() -> None:
     with pytest.raises(ValidationError, match=r"postgresql\+psycopg"):
         MigrationSettings(_env_file=None, database_url="sqlite:///unsafe.db")
 
+    marketplace_url = MigrationSettings(
+        _env_file=None,
+        database_url="postgresql://migration:strong@db.example.com/application",
+    )
+    assert marketplace_url.database_url.get_secret_value().startswith("postgresql+psycopg://")
+
 
 def test_hosted_migrations_require_file_secret_tls_and_release_identity(
     tmp_path: Path,
@@ -72,6 +78,17 @@ def test_hosted_migrations_require_file_secret_tls_and_release_identity(
             release_id="2026.08.24-phase0d-a",
             release_revision="a" * 40,
         )
+
+    environment_secret = MigrationSettings(
+        _env_file=None,
+        environment="production",
+        database_url="postgresql+psycopg://migration:strong@db.example.com/application",
+        hosted_environment_secrets=True,
+        database_tls_mode="verify-full",
+        release_id="2026.09.02-vercel-runtime",
+        release_revision="d" * 40,
+    )
+    assert environment_secret.database_url_file is None
 
 
 def test_release_artifact_contains_exactly_the_expected_head() -> None:

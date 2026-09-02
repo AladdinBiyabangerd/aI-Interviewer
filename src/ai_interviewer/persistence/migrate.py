@@ -56,6 +56,7 @@ class MigrationSettings(BaseSettings):
         "postgresql+psycopg://ai_interviewer:local-only@127.0.0.1:55432/ai_interviewer"
     )
     database_url_file: Path | None = None
+    hosted_environment_secrets: bool = False
     database_tls_mode: DatabaseTLSMode = "disable"
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
     database_statement_timeout_ms: int = Field(default=300_000, ge=1_000, le=900_000)
@@ -93,6 +94,17 @@ class MigrationSettings(BaseSettings):
     def validate_release_revision(cls, value: str) -> str:
         return normalize_release_revision(value)
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_driver(cls, value: Any) -> Any:
+        raw = value.get_secret_value() if isinstance(value, SecretStr) else value
+        if isinstance(raw, str):
+            if raw.startswith("postgres://"):
+                return "postgresql+psycopg://" + raw.removeprefix("postgres://")
+            if raw.startswith("postgresql://"):
+                return "postgresql+psycopg://" + raw.removeprefix("postgresql://")
+        return value
+
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, value: SecretStr) -> SecretStr:
@@ -108,8 +120,10 @@ class MigrationSettings(BaseSettings):
     def validate_hosted_release(self) -> Self:
         if self.environment not in {"staging", "production"}:
             return self
-        if self.database_url_file is None:
-            raise ValueError("hosted migrations require database_url_file")
+        if self.database_url_file is None and not self.hosted_environment_secrets:
+            raise ValueError(
+                "hosted migrations require database_url_file or explicit hosted_environment_secrets"
+            )
         if self.database_tls_mode == "disable":
             raise ValueError("hosted migrations require database TLS")
         if self.release_id == "development" or self.release_revision == "unknown":

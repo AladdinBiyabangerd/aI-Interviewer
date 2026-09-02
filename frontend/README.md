@@ -1,52 +1,43 @@
-# Interview Prep frontend
+# Interview Prep web application
 
-Focused bilingual (English and Azerbaijani) MVP for preparing for a specific job interview:
+This directory contains the standard Next.js 16 application deployed by Vercel. It
+supports English and Azerbaijani and implements the complete production text journey:
 
-- one clear form for company, role, vacancy requirements, stage, language and an optional CV;
-- transparent analysis states and honest company-evidence coverage;
-- grouped likely questions with source labels and concise relevance explanations;
-- distinct Real Interview and Practice modes with follow-up questions;
-- a focused final feedback summary without fake scores.
+- company, role, job requirements, stage, and interview-language input;
+- optional direct upload to a private persistent Vercel Blob store;
+- durable asynchronous OpenAI company research and separate private CV review;
+- evidence-linked likely questions and transparent coverage;
+- persisted Real Interview and Practice sessions;
+- answer-dependent adaptive follow-ups and feedback;
+- a final report generated from the candidate's saved answers.
 
-The frontend keeps its data contract in `lib/interview-api.ts`. By default it calls
-the same-origin server route at `/api/interview-preparations/analyze`. That route uses
-the OpenAI Responses API with web search to research public company evidence, returns
-the sources it actually used, and labels a question as company-grounded only when its
-evidence URL can be matched to those sources. It can also send an optional PDF or DOCX
-CV to a separate, non-search request so private CV contents do not become web-search
-queries.
+All application requests are same-origin. OpenAI, database, Blob, webhook, cron, and
+session secrets are read only in Node.js Route Handlers. There is no browser fallback
+that silently replaces failed production research with fabricated demo results.
 
-If live research is unavailable, the browser falls back to a transparent deterministic
-preview based on the vacancy and role. That preview is visibly labeled and does not
-claim to have parsed the CV or discovered private, exact interview questions. An
-external compatible analysis service can still be selected with
-`NEXT_PUBLIC_INTERVIEW_API_BASE_URL`.
+## Local development
 
-## Run locally
-
-Node.js `>=22.13.0` is required.
+Node.js 22.13 or newer and a PostgreSQL database at migration head are required. Copy
+`.env.example` to the ignored `.env.local`, use non-production credentials, then run:
 
 ```powershell
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Vercel Blob upload-completion callbacks cannot call localhost. For end-to-end local CV
+testing, use a secure tunnel and set `VERCEL_BLOB_CALLBACK_URL` to its public origin, or
+test the deployed Preview environment. No-CV analysis works without that callback.
 
-For live company research, add a private server-side key to `frontend/.env.local`:
-
-```dotenv
-OPENAI_API_KEY=replace-with-a-new-private-key
-OPENAI_INTERVIEW_MODEL=gpt-5.5
-```
-
-Never prefix the key with `NEXT_PUBLIC_`; browser-visible variables are not secret.
-
-## Verify
+## Verification
 
 ```powershell
-npm test
 npm run lint
-npm exec tsc -- --noEmit
+npm run typecheck
+npm test
+npm run build
 npm audit
 ```
+
+For Vercel services, migrations, environment variables, webhooks, retention, and
+post-deployment checks, see [`../docs/deployment/vercel.md`](../docs/deployment/vercel.md).

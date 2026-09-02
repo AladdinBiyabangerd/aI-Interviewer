@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$expectedSchemaRevision = "20260902_0013"
+$expectedSchemaRevision = "20260902_0014"
 $expectedProfilePromptContractSha256 = "c62321d636cba9cf8ffd8115b6318bd05c8b8c67d58bdaef3c78bfdac924e9d2"
 
 $rawInspection = docker image inspect $Image

@@ -29,16 +29,15 @@ For a single detailed account of everything implemented from the beginning, see 
 - Docker, for PostgreSQL integration and container verification
 - Node.js 22.13 or newer, for the interactive frontend demo
 
-## Frontend MVP demo
+## Production text application
 
-A bilingual English/Azerbaijani responsive product demo is available in [`frontend`](frontend/README.md).
-It implements the focused candidate journey: one interview-details form, transparent
-analysis states, an evidence-labeled likely-question sheet, Real Interview and Practice
-modes, relevant follow-ups, and a concise final report. Its same-origin demo analysis
-route can use OpenAI web search to build company-grounded likely questions from public
-sources and exposes those sources beside the result. If live research is not configured
-or fails, the interface explicitly falls back to a vacancy/role preview and does not
-present those questions as company-specific or as leaked, exact interview questions.
+A bilingual English/Azerbaijani responsive production application is available in
+[`frontend`](frontend/README.md). It implements the complete text flow: persistent private
+CV upload, asynchronous company/CV analysis, evidence-labeled likely questions, saved
+practice sessions, answer-dependent follow-ups, and an AI-generated final report. The
+standard Next.js application is deployable on Vercel; PostgreSQL, private Vercel Blob,
+and OpenAI remain server-side dependencies. See the complete
+[Vercel deployment runbook](docs/deployment/vercel.md).
 
 ```powershell
 cd frontend

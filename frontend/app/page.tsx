@@ -7,10 +7,20 @@ import {
   InterviewDetails,
   InterviewLanguage,
   InterviewStage,
+  PracticeDuration,
+  PracticeFeedback,
+  PracticeFocus,
+  PracticeMode,
+  PracticeReport,
   PreparationQuestion,
+  finishPracticeSession,
+  loadRecentPreparation,
   prepareInterview,
   QuestionCategory,
   Seniority,
+  startPractice,
+  submitPracticeAnswer,
+  uploadCv,
 } from "../lib/interview-api";
 import { UiCopy, UiLanguage, uiCopy } from "../lib/ui-copy";
 
@@ -22,10 +32,8 @@ type View =
   | "questions"
   | "practice-setup"
   | "practice-active"
+  | "report-loading"
   | "report";
-type PracticeMode = "Real Interview" | "Practice";
-type PracticeFocus = "Full Interview" | "Technical" | "HR / Behavioral" | "CV Deep Dive";
-type Duration = "15 min" | "30 min" | "45 min";
 
 type InterfaceLanguageContextValue = {
   language: UiLanguage;
@@ -63,9 +71,10 @@ const initialDetails: InterviewDetails = {
   seniority: "Not specified",
   stage: "Not sure",
   language: "English",
+  cvUploadId: null,
   cvFileName: null,
   cvFileType: null,
-  cvFileData: null,
+  cvFileSize: null,
 };
 
 const seniorities: Seniority[] = ["Not specified", "Intern", "Junior", "Mid-level", "Senior", "Lead"];
@@ -99,7 +108,7 @@ function Header({
   onNavigate: (view: View) => void;
 }) {
   const { language, setLanguage, t } = useInterfaceLanguage();
-  const preparedView = ["overview", "questions", "practice-setup", "practice-active", "report"].includes(activeView);
+  const preparedView = ["overview", "questions", "practice-setup", "practice-active", "report-loading", "report"].includes(activeView);
   return (
     <header className="site-header">
       <div className="header-inner">
@@ -250,7 +259,9 @@ function InterviewForm({
   const { t } = useInterfaceLanguage();
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const ready = value.company.trim().length > 1 && value.role.trim().length > 1 && value.jobDescription.trim().length >= 40;
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const ready = !uploading && value.company.trim().length > 1 && value.role.trim().length > 1 && value.jobDescription.trim().length >= 40;
 
   function update<K extends keyof InterviewDetails>(key: K, nextValue: InterviewDetails[K]) {
     onChange({ ...value, [key]: nextValue });
@@ -271,17 +282,16 @@ function InterviewForm({
       return;
     }
     setFileError(null);
+    setUploading(true);
+    setUploadProgress(0);
     try {
-      const cvFileData = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("invalid file data"));
-        reader.onerror = () => reject(reader.error ?? new Error("file read failed"));
-        reader.readAsDataURL(file);
-      });
-      onChange({ ...value, cvFileName: file.name, cvFileType: file.type, cvFileData });
+      const uploaded = await uploadCv(file, setUploadProgress);
+      onChange({ ...value, ...uploaded });
     } catch {
       setFileError(t.form.fileReadError);
       event.target.value = "";
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -332,13 +342,13 @@ function InterviewForm({
             <div className="uploaded-file">
               <span className="file-type" aria-hidden="true">CV</span>
               <p><strong>{value.cvFileName}</strong><small>{t.form.readyToReview}</small></p>
-              <button type="button" onClick={() => { onChange({ ...value, cvFileName: null, cvFileType: null, cvFileData: null }); if (fileInput.current) fileInput.current.value = ""; }}>{t.form.remove}</button>
+              <button type="button" onClick={() => { onChange({ ...value, cvUploadId: null, cvFileName: null, cvFileType: null, cvFileSize: null }); if (fileInput.current) fileInput.current.value = ""; }}>{t.form.remove}</button>
             </div>
           ) : (
             <label className="upload-field">
-              <input ref={fileInput} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={selectFile} />
-              <strong>{t.form.uploadStart} <span>{t.form.chooseFile}</span></strong>
-              <small>{t.form.uploadMeta}</small>
+              <input ref={fileInput} type="file" disabled={uploading} accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={selectFile} />
+              <strong>{uploading ? `${Math.round(uploadProgress)}%` : t.form.uploadStart} {!uploading ? <span>{t.form.chooseFile}</span> : null}</strong>
+              <small>{uploading ? "Uploading securely…" : t.form.uploadMeta}</small>
             </label>
           )}
           <p className="field-explanation">{t.form.cvExplanation}</p>
@@ -394,9 +404,9 @@ function CoverageNotice({ analysis }: { analysis: InterviewAnalysis }) {
         <div>
           <p>{t.preparation.companyData}</p>
           <strong>{analysis.companyCoverage === "Strong" ? t.preparation.strong : t.preparation.limited}</strong>
-          <span className={`analysis-mode ${analysis.analysisMode}`}>{analysis.analysisMode === "live_research" ? t.preparation.liveResearch : t.preparation.localPreview}</span>
+          <span className={`analysis-mode ${analysis.analysisMode}`}>{t.preparation.liveResearch}</span>
         </div>
-        <p>{analysis.analysisMode === "local_preview" ? t.preparation.previewNote : analysis.companyCoverage === "Strong" ? t.preparation.strongNote : t.preparation.limitedNote}</p>
+        <p>{analysis.companyCoverage === "Strong" ? t.preparation.strongNote : t.preparation.limitedNote}</p>
       </section>
       {analysis.researchSources.length ? (
         <section className="research-sources" aria-labelledby="research-sources-title">
@@ -517,11 +527,20 @@ function ChoiceGroup<T extends string>({ label, options, value, onChange, getLab
   );
 }
 
-function PracticeSetup({ analysis, onStart }: { analysis: InterviewAnalysis; onStart: (mode: PracticeMode, focus: PracticeFocus, duration: Duration) => void }) {
+function PracticeSetup({ analysis, error, onStart }: { analysis: InterviewAnalysis; error: string | null; onStart: (mode: PracticeMode, focus: PracticeFocus, duration: PracticeDuration) => Promise<void> }) {
   const { t } = useInterfaceLanguage();
   const [mode, setMode] = useState<PracticeMode>("Practice");
   const [focus, setFocus] = useState<PracticeFocus>("Full Interview");
-  const [duration, setDuration] = useState<Duration>("30 min");
+  const [duration, setDuration] = useState<PracticeDuration>("30 min");
+  const [starting, setStarting] = useState(false);
+  async function begin() {
+    setStarting(true);
+    try {
+      await onStart(mode, focus, duration);
+    } finally {
+      setStarting(false);
+    }
+  }
   return (
     <main className="page prepared-page practice-setup-page">
       <PreparationHeader analysis={analysis} />
@@ -533,7 +552,8 @@ function PracticeSetup({ analysis, onStart }: { analysis: InterviewAnalysis; onS
         </div></fieldset>
         <ChoiceGroup label={t.practice.focus} options={["Full Interview", "Technical", "HR / Behavioral", "CV Deep Dive"]} value={focus} onChange={setFocus} getLabel={(option) => t.practice.focusLabels[option]} />
         <ChoiceGroup label={t.practice.duration} options={["15 min", "30 min", "45 min"]} value={duration} onChange={setDuration} />
-        <div className="practice-start"><p>{t.practice.questionCount(analysis.questions.length)}</p><button className="button button-primary" onClick={() => onStart(mode, focus, duration)} type="button">{t.practice.start} <span aria-hidden="true">→</span></button></div>
+        <div className="practice-start"><p>{t.practice.questionCount(analysis.questions.length)}</p><button className="button button-primary" disabled={starting} onClick={begin} type="button">{starting ? "Starting…" : t.practice.start} <span aria-hidden="true">→</span></button></div>
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
       </section>
     </main>
   );
@@ -543,12 +563,14 @@ function PracticeActive({
   analysis,
   mode,
   questions,
+  sessionId,
   initialQuestionId,
   onFinish,
 }: {
   analysis: InterviewAnalysis;
   mode: PracticeMode;
   questions: PreparationQuestion[];
+  sessionId: string;
   initialQuestionId: string | null;
   onFinish: (completed: number) => void;
 }) {
@@ -557,69 +579,101 @@ function PracticeActive({
   const initialIndex = Math.max(0, requestedIndex);
   const [index, setIndex] = useState(initialIndex);
   const [answer, setAnswer] = useState("");
-  const [followUp, setFollowUp] = useState(false);
-  const [feedback, setFeedback] = useState(false);
+  const [followUp, setFollowUp] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<PracticeFeedback | null>(null);
+  const [pendingResult, setPendingResult] = useState<Awaited<ReturnType<typeof submitPracticeAnswer>> | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const current = questions[index];
   const completed = index + (followUp ? 1 : 0);
 
-  function advance() {
-    if (!followUp && current.followUp) {
-      setFollowUp(true);
-    } else if (index >= questions.length - 1) {
+  function advance(result: Awaited<ReturnType<typeof submitPracticeAnswer>>) {
+    if (result.followUp) {
+      setFollowUp(result.followUp);
+    } else if (result.sessionComplete) {
       onFinish(questions.length);
       return;
-    } else {
+    } else if (result.nextQuestion) {
       setIndex((value) => value + 1);
-      setFollowUp(false);
+      setFollowUp(null);
     }
     setAnswer("");
-    setFeedback(false);
+    setFeedback(null);
+    setPendingResult(null);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (answer.trim().length < 30) return;
-    if (mode === "Practice") setFeedback(true);
-    else advance();
+    if (answer.trim().length < 30 || processing) return;
+    setProcessing(true);
+    setError(null);
+    try {
+      const result = await submitPracticeAnswer({ sessionId, answer: answer.trim() });
+      if (mode === "Practice") {
+        setFeedback(result.feedback);
+        setPendingResult(result);
+      } else {
+        advance(result);
+      }
+    } catch {
+      setError("Your answer could not be evaluated. Please try again.");
+    } finally {
+      setProcessing(false);
+    }
   }
 
   return (
     <main className="page active-interview-page">
-      <div className="active-context"><button type="button" onClick={() => onFinish(completed)}>{t.active.end}</button><p><strong>{analysis.details.company} · {analysis.details.role}</strong><span>{t.stageLabels[analysis.details.stage]} · {t.practice.modeLabels[mode]}</span></p><p>{t.active.questionProgress(index + 1, questions.length)}</p></div>
+      <div className="active-context"><button disabled={completed === 0 || processing} type="button" onClick={() => onFinish(completed)}>{t.active.end}</button><p><strong>{analysis.details.company} · {analysis.details.role}</strong><span>{t.stageLabels[analysis.details.stage]} · {t.practice.modeLabels[mode]}</span></p><p>{t.active.questionProgress(index + 1, questions.length)}</p></div>
       <div className="interview-progress" aria-label={t.active.questionProgress(index + 1, questions.length)}><span style={{ width: `${((index + 1) / questions.length) * 100}%` }} /></div>
       <section className="interview-question" aria-live="polite">
         <p className="interviewer-label">{t.active.interviewer}</p>
-        <h1>{followUp ? current.followUp : current.question}</h1>
+        <h1>{followUp ?? current.question}</h1>
         {!followUp ? <p className="source-line">{t.active.selectedFrom}: {current.sources.map((source) => t.sourceLabels[source]).join(" · ")}</p> : <p className="source-line">{t.active.followUpTopic}</p>}
       </section>
       <form className="answer-form" onSubmit={submit}>
         <label htmlFor="candidate-answer">{t.active.answer}</label>
-        <textarea id="candidate-answer" maxLength={2500} rows={8} autoFocus placeholder={t.active.placeholder} value={answer} onChange={(event) => setAnswer(event.target.value)} disabled={feedback} />
-        <div className="answer-footer"><span>{answer.length} / 2,500</span><button className="button button-primary" disabled={answer.trim().length < 30 || feedback} type="submit">{t.active.submit}</button></div>
+        <textarea id="candidate-answer" maxLength={2500} rows={8} autoFocus placeholder={t.active.placeholder} value={answer} onChange={(event) => setAnswer(event.target.value)} disabled={Boolean(feedback) || processing} />
+        <div className="answer-footer"><span>{answer.length} / 2,500</span><button className="button button-primary" disabled={answer.trim().length < 30 || Boolean(feedback) || processing} type="submit">{processing ? "Evaluating…" : t.active.submit}</button></div>
       </form>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
       {feedback ? (
         <section className="inline-feedback" aria-live="polite">
           <div><p className="eyebrow">{t.active.feedback}</p><h2>{t.active.feedbackTitle}</h2></div>
-          <div className="feedback-columns"><div><strong>{t.active.strongPoints}</strong><ul>{t.active.strongItems.map((item) => <li key={item}>{item}</li>)}</ul></div><div><strong>{t.active.improve}</strong><ul>{t.active.improveItems.map((item) => <li key={item}>{item}</li>)}</ul></div></div>
-          <div className="likely-follow-up"><span>{t.active.likelyFollowUp}</span><p>“{current.followUp}”</p></div>
-          <button className="button button-primary" type="button" onClick={advance}>{t.active.continue} <span aria-hidden="true">→</span></button>
+          <div className="feedback-columns"><div><strong>{t.active.strongPoints}</strong><ul>{feedback.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div><div><strong>{t.active.improve}</strong><ul>{feedback.improvements.map((item) => <li key={item}>{item}</li>)}</ul></div></div>
+          {pendingResult?.followUp ? <div className="likely-follow-up"><span>{t.active.likelyFollowUp}</span><p>“{pendingResult.followUp}”</p></div> : null}
+          <button className="button button-primary" type="button" onClick={() => pendingResult && advance(pendingResult)}>{t.active.continue} <span aria-hidden="true">→</span></button>
         </section>
       ) : null}
     </main>
   );
 }
 
-function Report({ analysis, mode, completed, onQuestions, onRestart }: { analysis: InterviewAnalysis; mode: PracticeMode; completed: number; onQuestions: () => void; onRestart: () => void }) {
+function Report({ analysis, mode, completed, report, onQuestions, onRestart }: { analysis: InterviewAnalysis; mode: PracticeMode; completed: number; report: PracticeReport; onQuestions: () => void; onRestart: () => void }) {
   const { t } = useInterfaceLanguage();
   return (
     <main className="page prepared-page report-page">
       <PreparationHeader analysis={analysis} />
-      <section className="report-intro"><p className="eyebrow">{t.report.complete}</p><h2>{t.report.title}</h2><p>{t.report.summary(completed, t.practice.modeLabels[mode])}</p></section>
+      <section className="report-intro"><p className="eyebrow">{t.report.complete}</p><h2>{t.report.title}</h2><p>{report.summary || t.report.summary(completed, t.practice.modeLabels[mode])}</p></section>
       <div className="report-grid">
-        <section><p className="eyebrow">{t.report.worked}</p><h3>{t.report.keep}</h3><ul>{t.report.workedItems.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section><p className="eyebrow">{t.report.improve}</p><h3>{t.report.credible}</h3><ul>{t.report.improveItems.map((item) => <li key={item}>{item}</li>)}</ul></section>
+        <section><p className="eyebrow">{t.report.worked}</p><h3>{t.report.keep}</h3><ul>{report.strengths.map((item) => <li key={item}>{item}</li>)}</ul></section>
+        <section><p className="eyebrow">{t.report.improve}</p><h3>{t.report.credible}</h3><ul>{report.improvements.map((item) => <li key={item}>{item}</li>)}</ul></section>
       </div>
-      <section className="recommended-next"><div><span>{t.report.next}</span><strong>{t.report.recommendation}</strong></div><button className="button button-secondary" onClick={onQuestions} type="button">{t.report.viewQuestions}</button><button className="button button-primary" onClick={onRestart} type="button">{t.report.practiceAgain}</button></section>
+      <section className="recommended-next"><div><span>{t.report.next}</span><strong>{report.recommendation}</strong></div><button className="button button-secondary" onClick={onQuestions} type="button">{t.report.viewQuestions}</button><button className="button button-primary" onClick={onRestart} type="button">{t.report.practiceAgain}</button></section>
+    </main>
+  );
+}
+
+function ReportLoading({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  const { language } = useInterfaceLanguage();
+  return (
+    <main className="page analysis-page" aria-live="polite" aria-busy={!error}>
+      <section className="analysis-panel">
+        <p className="eyebrow">{language === "az" ? "Yekun hesabat" : "Final report"}</p>
+        <h1>{error ? (language === "az" ? "Hesabat hazır olmadı" : "The report is not ready") : (language === "az" ? "Cavablarınız təhlil edilir" : "Analyzing your answers")}</h1>
+        <p className="analysis-context">{error ?? (language === "az" ? "Güclü tərəflər və növbəti addımlar hazırlanır…" : "Preparing strengths, improvements and your next step…")}</p>
+        {error ? <button className="button button-primary" onClick={onRetry} type="button">{language === "az" ? "Yenidən yoxla" : "Try again"}</button> : null}
+      </section>
     </main>
   );
 }
@@ -634,12 +688,24 @@ export default function HomePage() {
   const [practiceMode, setPracticeMode] = useState<PracticeMode>("Practice");
   const [practiceQuestions, setPracticeQuestions] = useState<PreparationQuestion[]>([]);
   const [initialQuestionId, setInitialQuestionId] = useState<string | null>(null);
+  const [practiceSessionId, setPracticeSessionId] = useState<string | null>(null);
+  const [practiceError, setPracticeError] = useState<string | null>(null);
+  const [practiceReport, setPracticeReport] = useState<PracticeReport | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [completedQuestions, setCompletedQuestions] = useState(0);
   const t = uiCopy[uiLanguage];
 
   useEffect(() => {
     document.documentElement.lang = uiLanguage;
   }, [uiLanguage]);
+
+  useEffect(() => {
+    let active = true;
+    loadRecentPreparation().then((recent) => {
+      if (active && recent) setAnalysis((current) => current ?? recent);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   function changeUiLanguage(language: UiLanguage) {
     setUiLanguage(language);
@@ -659,26 +725,51 @@ export default function HomePage() {
     }
   }
 
-  function beginPractice(mode: PracticeMode, focus: PracticeFocus, _duration: Duration, questionId: string | null = null) {
+  async function beginPractice(mode: PracticeMode, focus: PracticeFocus, duration: PracticeDuration, questionId: string | null = null) {
     if (!analysis) return;
+    setPracticeError(null);
     let selected = analysis.questions;
     if (focus === "Technical") selected = selected.filter((question) => ["Technical Questions", "System Design"].includes(question.category));
     if (focus === "HR / Behavioral") selected = selected.filter((question) => question.category === "HR / Recruiter");
     if (focus === "CV Deep Dive") selected = selected.filter((question) => question.category === "CV Questions");
     if (!selected.length) selected = analysis.questions;
+    if (questionId) selected = selected.filter((question) => question.id === questionId);
+    if (!selected.length) selected = analysis.questions.slice(0, 1);
+    try {
+      const started = await startPractice({
+        preparationId: analysis.id,
+        mode,
+        focus,
+        duration,
+        questionIds: selected.map((question) => question.id),
+      });
+      setPracticeSessionId(started.sessionId);
+    } catch {
+      setPracticeError("The practice session could not be started. Please try again.");
+      return;
+    }
     setPracticeMode(mode);
     setPracticeQuestions(selected);
     setInitialQuestionId(questionId);
     setView("practice-active");
   }
 
-  function practiceOne(questionId?: string) {
-    beginPractice("Practice", "Full Interview", "15 min", questionId ?? null);
+  async function practiceOne(questionId?: string) {
+    await beginPractice("Practice", "Full Interview", "15 min", questionId ?? null);
   }
 
-  function finishPractice(completed: number) {
+  async function finishPractice(completed: number) {
+    if (!practiceSessionId) return;
     setCompletedQuestions(completed);
-    setView("report");
+    setReportError(null);
+    setView("report-loading");
+    try {
+      const report = await finishPracticeSession(practiceSessionId);
+      setPracticeReport(report);
+      setView("report");
+    } catch {
+      setReportError("The report could not be generated. Your saved answers are safe; please try again.");
+    }
   }
 
   return (
@@ -689,9 +780,10 @@ export default function HomePage() {
       {view === "analyzing" ? <Analyzing details={details} activeStep={analysisStep} /> : null}
       {view === "overview" && analysis ? <Overview analysis={analysis} onQuestions={() => setView("questions")} onPractice={() => setView("practice-setup")} /> : null}
       {view === "questions" && analysis ? <Questions analysis={analysis} onPractice={practiceOne} /> : null}
-      {view === "practice-setup" && analysis ? <PracticeSetup analysis={analysis} onStart={beginPractice} /> : null}
-      {view === "practice-active" && analysis ? <PracticeActive key={`${analysis.id}-${initialQuestionId}-${practiceMode}`} analysis={analysis} mode={practiceMode} questions={practiceQuestions.length ? practiceQuestions : analysis.questions} initialQuestionId={initialQuestionId} onFinish={finishPractice} /> : null}
-      {view === "report" && analysis ? <Report analysis={analysis} mode={practiceMode} completed={completedQuestions} onQuestions={() => setView("questions")} onRestart={() => setView("practice-setup")} /> : null}
+      {view === "practice-setup" && analysis ? <PracticeSetup analysis={analysis} error={practiceError} onStart={beginPractice} /> : null}
+      {view === "practice-active" && analysis && practiceSessionId ? <PracticeActive key={`${analysis.id}-${initialQuestionId}-${practiceMode}`} analysis={analysis} mode={practiceMode} questions={practiceQuestions.length ? practiceQuestions : analysis.questions} sessionId={practiceSessionId} initialQuestionId={initialQuestionId} onFinish={finishPractice} /> : null}
+      {view === "report-loading" ? <ReportLoading error={reportError} onRetry={() => finishPractice(completedQuestions)} /> : null}
+      {view === "report" && analysis && practiceReport ? <Report analysis={analysis} mode={practiceMode} completed={completedQuestions} report={practiceReport} onQuestions={() => setView("questions")} onRestart={() => { setPracticeReport(null); setPracticeSessionId(null); setView("practice-setup"); }} /> : null}
     </InterfaceLanguageContext.Provider>
   );
 }
