@@ -1,15 +1,19 @@
-# Interview AI demo
+# Interview Prep frontend
 
-Interactive English MVP for presenting the candidate preparation journey:
+Focused English MVP for preparing for a specific job interview:
 
-- preparation setup with sample CV and job description;
-- simulated AI profile and role-fit analysis;
-- three-question interview flow;
-- a one-click guided answer path for reliable live presentations;
-- scorecard, strengths, gaps, and a seven-day action plan.
+- one clear form for company, role, vacancy requirements, stage, language and an optional CV;
+- transparent analysis states and honest company-evidence coverage;
+- grouped likely questions with source labels and concise relevance explanations;
+- distinct Real Interview and Practice modes with follow-up questions;
+- a focused final feedback summary without fake scores.
 
-The current frontend deliberately uses synthetic demo data. It does not upload a
-real CV, call OpenAI, or persist candidate data yet.
+The frontend keeps its data contract in `lib/interview-api.ts`. When
+`NEXT_PUBLIC_INTERVIEW_API_BASE_URL` is configured it calls the interview-analysis
+endpoint. Without that value it uses a transparent, deterministic local preview
+adapter so the complete journey remains demonstrable while the final backend
+endpoint is being connected. The local adapter does not claim to have parsed an
+uploaded CV or found private company interview questions.
 
 ## Run locally
 

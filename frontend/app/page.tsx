@@ -1,322 +1,511 @@
 "use client";
 
-import { useState } from "react";
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
 
-type View = "home" | "setup" | "profile" | "interview" | "report";
-type Scenario = "Technical" | "Behavioral" | "HR screening";
+import {
+  analysisSteps,
+  InterviewAnalysis,
+  InterviewDetails,
+  InterviewLanguage,
+  InterviewStage,
+  PreparationQuestion,
+  prepareInterview,
+  QuestionCategory,
+  Seniority,
+} from "../lib/interview-api";
 
-type PreparationContext = {
-  company: string;
-  role: string;
-  scenario: Scenario;
+type View =
+  | "home"
+  | "form"
+  | "analyzing"
+  | "overview"
+  | "questions"
+  | "practice-setup"
+  | "practice-active"
+  | "report";
+type PracticeMode = "Real Interview" | "Practice";
+type PracticeFocus = "Full Interview" | "Technical" | "HR / Behavioral" | "CV Deep Dive";
+type Duration = "15 min" | "30 min" | "45 min";
+
+const initialDetails: InterviewDetails = {
+  company: "",
+  role: "",
+  jobDescription: "",
+  jobUrl: "",
+  seniority: "Not specified",
+  stage: "Not sure",
+  language: "English",
+  cvFileName: null,
 };
 
-const defaultContext: PreparationContext = {
-  company: "Kapital Bank",
-  role: "Senior Backend Developer",
-  scenario: "Technical",
-};
-
-const interviewQuestions = [
-  {
-    label: "Technical depth",
-    question:
-      "How would you investigate and improve an API whose latency increases under heavy traffic?",
-    hint: "Explain what you would measure first, how you would isolate the cause, and how you would validate the result.",
-    sampleAnswer:
-      "I would begin with latency percentiles, traces, and saturation metrics to identify where requests slow down. I would reproduce the traffic pattern, test the smallest safe change, and compare p95 latency and error rate before a gradual rollout.",
-  },
-  {
-    label: "Problem solving",
-    question:
-      "A critical production service has failed unexpectedly. What would you do in the first 30 minutes?",
-    hint: "Show how you protect customers, coordinate the response, and narrow the root cause.",
-    sampleAnswer:
-      "I would assign incident ownership, protect customers with a rollback or traffic shift, and communicate a clear status. In parallel, I would review recent deployments, logs, traces, and dependency health before testing a recovery action.",
-  },
-  {
-    label: "Leadership",
-    question:
-      "Tell me about a time you resolved a disagreement over a technical decision within your team.",
-    hint: "Use a concrete situation, your action, and a measurable result.",
-    sampleAnswer:
-      "During a payment-service redesign, two engineers disagreed about introducing a new queue. I documented the failure modes, facilitated a short design review, and proposed a load test. The evidence helped us choose the simpler option and ship on time.",
-  },
+const seniorities: Seniority[] = ["Not specified", "Intern", "Junior", "Mid-level", "Senior", "Lead"];
+const stages: InterviewStage[] = [
+  "Not sure",
+  "HR / Recruiter",
+  "Technical Interview",
+  "Coding Interview",
+  "System Design",
+  "Hiring Manager",
+  "Final Interview",
 ];
 
-const flow: { id: Exclude<View, "home">; label: string }[] = [
-  { id: "setup", label: "Context" },
-  { id: "profile", label: "Brief" },
-  { id: "interview", label: "Practice" },
-  { id: "report", label: "Feedback" },
-];
+function Brand({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="brand" type="button" onClick={onClick} aria-label="Interview Prep home">
+      <span aria-hidden="true">IP</span>
+      Interview Prep
+    </button>
+  );
+}
 
-function Header({ view, onNavigate }: { view: View; onNavigate: (view: View) => void }) {
+function Header({
+  analysis,
+  activeView,
+  onNavigate,
+}: {
+  analysis: InterviewAnalysis | null;
+  activeView: View;
+  onNavigate: (view: View) => void;
+}) {
+  const preparedView = ["overview", "questions", "practice-setup", "practice-active", "report"].includes(activeView);
   return (
     <header className="site-header">
       <div className="header-inner">
-        <button className="brand" type="button" onClick={() => onNavigate("home")} aria-label="InterviewOS home">
-          <span aria-hidden="true">IO</span>
-          InterviewOS
-        </button>
-        <nav className="flow-nav" aria-label="Demo steps">
-          {flow.map((item, index) => (
-            <button
-              className={view === item.id ? "active" : ""}
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              type="button"
-            >
-              <span>{index + 1}</span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <span className="ai-label">AI-assisted demo</span>
+        <Brand onClick={() => onNavigate("home")} />
+        {analysis && preparedView ? (
+          <nav className="preparation-nav" aria-label="Interview preparation">
+            <button className={activeView === "overview" ? "active" : ""} onClick={() => onNavigate("overview")} type="button">Overview</button>
+            <button className={activeView === "questions" ? "active" : ""} onClick={() => onNavigate("questions")} type="button">Questions</button>
+            <button className={activeView.startsWith("practice") ? "active" : ""} onClick={() => onNavigate("practice-setup")} type="button">Practice</button>
+          </nav>
+        ) : null}
+        <button className="header-action" type="button" onClick={() => onNavigate("form")}>New preparation</button>
       </div>
     </header>
   );
 }
 
-function PageHeading({ step, title, description }: { step: string; title: string; description: string }) {
+function Home({ recent, onStart, onOpen }: { recent: InterviewAnalysis | null; onStart: () => void; onOpen: () => void }) {
   return (
-    <div className="page-heading">
-      <p className="overline">{step}</p>
-      <h1>{title}</h1>
-      <p>{description}</p>
-    </div>
-  );
-}
-
-function Home({ onStart }: { onStart: () => void }) {
-  return (
-    <div className="page home-page">
-      <section className="home-hero">
-        <p className="overline">AI-assisted interview preparation</p>
-        <h1>Practice the questions that matter.</h1>
-        <p className="lead">
-          Build a focused interview from your target role, practise realistic questions,
-          and leave with feedback you can use.
+    <main className="page home-page">
+      <section className="home-intro">
+        <p className="eyebrow">Interview preparation</p>
+        <h1>Prepare for your interview</h1>
+        <p className="home-copy">
+          Tell us where you&apos;re interviewing, paste the job requirements, and optionally add your CV.
+          We&apos;ll prepare questions tailored to the role and interview.
         </p>
-        <div className="hero-actions">
-          <button className="primary-button" onClick={onStart} type="button">
-            Start interview <span aria-hidden="true">→</span>
-          </button>
-          <span>No account required · 3-minute guided demo</span>
-        </div>
+        <button className="button button-primary" onClick={onStart} type="button">
+          Prepare for an Interview <span aria-hidden="true">→</span>
+        </button>
+        <p className="home-note">No account required for this product preview.</p>
       </section>
 
-      <section className="journey" aria-labelledby="journey-title">
-        <div>
-          <p className="overline">How it works</p>
-          <h2 id="journey-title">A clear path from role to feedback.</h2>
-        </div>
-        <ol>
-          <li><span>01</span><div><h3>Set the context</h3><p>Add the role, company, and interview type.</p></div></li>
-          <li><span>02</span><div><h3>Practise with AI</h3><p>Answer targeted questions in a quiet workspace.</p></div></li>
-          <li><span>03</span><div><h3>Review the evidence</h3><p>See strengths, gaps, and clear next actions.</p></div></li>
-        </ol>
-      </section>
-    </div>
+      {recent ? (
+        <section className="recent-section" aria-labelledby="recent-title">
+          <div className="section-heading compact-heading">
+            <div><p className="eyebrow">Recent</p><h2 id="recent-title">Continue preparing</h2></div>
+          </div>
+          <button className="recent-row" type="button" onClick={onOpen}>
+            <span><strong>{recent.details.company}</strong><small>{recent.details.role}</small></span>
+            <span><small>{recent.details.stage}</small><strong aria-hidden="true">→</strong></span>
+          </button>
+        </section>
+      ) : (
+        <section className="process-strip" aria-label="How interview preparation works">
+          <div><span>01</span><p><strong>Add the interview details</strong><small>Company, role and vacancy requirements.</small></p></div>
+          <div><span>02</span><p><strong>Review likely questions</strong><small>See what to prepare and why it matters.</small></p></div>
+          <div><span>03</span><p><strong>Practice when you are ready</strong><small>Answer in a focused interview setting.</small></p></div>
+        </section>
+      )}
+    </main>
   );
 }
 
-function Setup({ context, onContinue }: { context: PreparationContext; onContinue: (value: PreparationContext) => void }) {
-  const [company, setCompany] = useState(context.company);
-  const [role, setRole] = useState(context.role);
-  const [scenario, setScenario] = useState<Scenario>(context.scenario);
-  const [loading, setLoading] = useState(false);
-  const isReady = company.trim().length > 1 && role.trim().length > 1;
+function InterviewForm({
+  value,
+  error,
+  onChange,
+  onSubmit,
+}: {
+  value: InterviewDetails;
+  error: string | null;
+  onChange: (value: InterviewDetails) => void;
+  onSubmit: () => void;
+}) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const ready = value.company.trim().length > 1 && value.role.trim().length > 1 && value.jobDescription.trim().length >= 40;
 
-  function submit() {
-    if (!isReady) return;
-    setLoading(true);
-    window.setTimeout(() => {
-      onContinue({ company: company.trim(), role: role.trim(), scenario });
-    }, 700);
+  function update<K extends keyof InterviewDetails>(key: K, nextValue: InterviewDetails[K]) {
+    onChange({ ...value, [key]: nextValue });
   }
 
-  return (
-    <div className="page flow-page">
-      <PageHeading
-        step="Step 1 of 4 · Context"
-        title="Set the interview context."
-        description="A few details are enough to make the practice relevant to the role."
-      />
-
-      <section className="form-panel" aria-label="Interview context">
-        <div className="field-grid">
-          <label htmlFor="company">Company<input id="company" value={company} onChange={(event) => setCompany(event.target.value)} /></label>
-          <label htmlFor="role">Target role<input id="role" value={role} onChange={(event) => setRole(event.target.value)} /></label>
-        </div>
-
-        <fieldset className="scenario-field">
-          <legend>Interview scenario</legend>
-          <div className="scenario-grid">
-            {(["Technical", "Behavioral", "HR screening"] as Scenario[]).map((item) => (
-              <button
-                aria-pressed={scenario === item}
-                className={scenario === item ? "selected" : ""}
-                key={item}
-                onClick={() => setScenario(item)}
-                type="button"
-              >
-                <span>{item}</span>
-                <small>{item === "Technical" ? "Systems and engineering" : item === "Behavioral" ? "Experience and decisions" : "Motivation and fit"}</small>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        <div className="source-files" aria-label="Demo source material">
-          <div><span aria-hidden="true">CV</span><p><strong>Elvin_Mammadov_CV.pdf</strong><small>Synthetic demo resume</small></p></div>
-          <div><span aria-hidden="true">JD</span><p><strong>Senior_Backend_JD.pdf</strong><small>Synthetic job description</small></p></div>
-        </div>
-
-        <div className="panel-footer" aria-live="polite">
-          <p>Demo files contain no personal data.</p>
-          <button className="primary-button" disabled={!isReady || loading} onClick={submit} type="button">
-            {loading ? "Preparing brief…" : "Create candidate brief"}<span aria-hidden="true">→</span>
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function Profile({ context, onStart }: { context: PreparationContext; onStart: () => void }) {
-  return (
-    <div className="page flow-page">
-      <PageHeading
-        step="Step 2 of 4 · Candidate brief"
-        title="Focus on the evidence."
-        description={`Your experience is compared with the ${context.role} requirements at ${context.company}.`}
-      />
-
-      <section className="brief-summary">
-        <div className="match-summary"><strong>86%</strong><span>Role alignment</span></div>
-        <div><h2>Strong foundation for a {context.scenario.toLowerCase()} interview.</h2><p>The practice will test technical decisions, measurable outcomes, and communication under pressure.</p></div>
-      </section>
-
-      <div className="brief-grid">
-        <section className="content-card">
-          <p className="overline">Confirmed strengths</p>
-          <h2>Evidence to lead with</h2>
-          <ul className="plain-list"><li>Python and FastAPI delivery</li><li>PostgreSQL performance work</li><li>Microservice architecture</li></ul>
-          <blockquote>“Designed 12 services for a payment platform and improved reliability under peak traffic.”</blockquote>
-        </section>
-        <section className="content-card">
-          <p className="overline">Areas to explore</p>
-          <h2>Questions to prepare for</h2>
-          <ol className="numbered-list"><li><span>01</span><p><strong>System design trade-offs</strong><small>Explain why one option was better than another.</small></p></li><li><span>02</span><p><strong>Leadership</strong><small>Show your role in resolving disagreement.</small></p></li><li><span>03</span><p><strong>Business impact</strong><small>Connect technical work to measurable outcomes.</small></p></li></ol>
-        </section>
-      </div>
-
-      <div className="action-row"><p>12 questions · Approximately 45 minutes</p><button className="primary-button" onClick={onStart} type="button">Start practice <span aria-hidden="true">→</span></button></div>
-    </div>
-  );
-}
-
-function Interview({ context, onFinish }: { context: PreparationContext; onFinish: () => void }) {
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [answer, setAnswer] = useState("");
-  const current = interviewQuestions[questionIndex];
-  const progress = ((questionIndex + 1) / interviewQuestions.length) * 100;
-
-  function next() {
-    if (questionIndex === interviewQuestions.length - 1) {
-      onFinish();
+  function selectFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const extension = file.name.split(".").pop()?.toLocaleLowerCase("en-US");
+    if (!extension || !["pdf", "docx"].includes(extension)) {
+      setFileError("Please choose a PDF or DOCX file.");
+      event.target.value = "";
       return;
     }
-    setQuestionIndex((value) => value + 1);
-    setAnswer("");
+    if (file.size > 10 * 1024 * 1024) {
+      setFileError("The CV must be smaller than 10 MB.");
+      event.target.value = "";
+      return;
+    }
+    setFileError(null);
+    update("cvFileName", file.name);
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (ready) onSubmit();
   }
 
   return (
-    <div className="page interview-page">
-      <div className="interview-topline">
-        <div><span className="ai-mark" aria-hidden="true">AI</span><p><strong>AI Interview Assistant</strong><small>{context.role} · {context.scenario}</small></p></div>
-        <p>Question {questionIndex + 1} of {interviewQuestions.length}</p>
+    <main className="page form-page">
+      <div className="page-heading">
+        <p className="eyebrow">New preparation</p>
+        <h1>Tell us what interview you&apos;re preparing for.</h1>
+        <p>Complete the details below. It should take no more than a few minutes.</p>
       </div>
-      <div className="progress-track" role="progressbar" aria-label="Interview progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><span style={{ width: `${progress}%` }} /></div>
 
-      <main className="dialogue" aria-live="polite">
-        <p className="overline">{current.label}</p>
-        <h1>{current.question}</h1>
-        <p className="question-hint">{current.hint}</p>
+      <form className="interview-form" onSubmit={submit}>
+        <section className="form-section" aria-labelledby="role-details-heading">
+          <div className="form-section-heading"><span>01</span><div><h2 id="role-details-heading">Role details</h2><p>Start with the company and position.</p></div></div>
+          <div className="two-column-fields">
+            <label>Company<input required autoComplete="organization" placeholder="PASHA Bank" value={value.company} onChange={(event) => update("company", event.target.value)} /></label>
+            <label>Role / Position<input required placeholder="AI Engineer" value={value.role} onChange={(event) => update("role", event.target.value)} /></label>
+          </div>
+          <label className="full-field">Job posting link <span>Optional</span><input type="url" inputMode="url" placeholder="https://..." value={value.jobUrl} onChange={(event) => update("jobUrl", event.target.value)} /></label>
+        </section>
 
-        <label htmlFor="answer">Your answer</label>
-        <textarea
-          id="answer"
-          maxLength={1500}
-          onChange={(event) => setAnswer(event.target.value)}
-          placeholder="Write your answer clearly and use a specific example."
-          value={answer}
-        />
-        <div className="answer-actions">
-          <span>{answer.length} / 1,500</span>
-          <div><button className="secondary-button" onClick={() => setAnswer(current.sampleAnswer)} type="button">Use demo answer</button><button className="primary-button" disabled={answer.trim().length < 20} onClick={next} type="button">{questionIndex === interviewQuestions.length - 1 ? "Get feedback" : "Next question"}<span aria-hidden="true">→</span></button></div>
+        <section className="form-section" aria-labelledby="requirements-heading">
+          <div className="form-section-heading"><span>02</span><div><h2 id="requirements-heading">Job requirements</h2><p>This is the strongest input for tailoring your questions.</p></div></div>
+          <label className="full-field important-field">
+            Job Description / Requirements
+            <textarea required minLength={40} rows={9} placeholder="Paste the job description or vacancy requirements here..." value={value.jobDescription} onChange={(event) => update("jobDescription", event.target.value)} />
+            <small>{value.jobDescription.length} characters · minimum 40</small>
+          </label>
+        </section>
+
+        <section className="form-section" aria-labelledby="interview-details-heading">
+          <div className="form-section-heading"><span>03</span><div><h2 id="interview-details-heading">Interview details</h2><p>Choose what you know. “Not sure” is completely fine.</p></div></div>
+          <div className="three-column-fields">
+            <label>Seniority <span>Optional</span><select value={value.seniority} onChange={(event) => update("seniority", event.target.value as Seniority)}>{seniorities.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label>Interview stage<select value={value.stage} onChange={(event) => update("stage", event.target.value as InterviewStage)}>{stages.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label>Interview language<select value={value.language} onChange={(event) => update("language", event.target.value as InterviewLanguage)}><option>English</option><option>Azerbaijani</option></select></label>
+          </div>
+        </section>
+
+        <section className="form-section" aria-labelledby="cv-heading">
+          <div className="form-section-heading"><span>04</span><div><h2 id="cv-heading">Add your CV <em>Optional</em></h2><p>Get questions based on the projects, technologies and claims in your CV.</p></div></div>
+          {value.cvFileName ? (
+            <div className="uploaded-file">
+              <span className="file-type" aria-hidden="true">CV</span>
+              <p><strong>{value.cvFileName}</strong><small>Ready to review</small></p>
+              <button type="button" onClick={() => { update("cvFileName", null); if (fileInput.current) fileInput.current.value = ""; }}>Remove</button>
+            </div>
+          ) : (
+            <label className="upload-field">
+              <input ref={fileInput} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={selectFile} />
+              <strong>Drag and drop your CV, or <span>choose a file</span></strong>
+              <small>PDF or DOCX · maximum 10 MB</small>
+            </label>
+          )}
+          <p className="field-explanation">Adding your CV helps us prepare questions interviewers may ask about your projects, skills and experience.</p>
+          {fileError ? <p className="form-error" role="alert">{fileError}</p> : null}
+        </section>
+
+        <div className="form-footer">
+          <p>We use these details only to prepare this interview.</p>
+          <button className="button button-primary" disabled={!ready} type="submit">Prepare Interview <span aria-hidden="true">→</span></button>
         </div>
-      </main>
-      <p className="speaking-note">Tip: Use short sentences and make your personal contribution explicit.</p>
+        {error ? <p className="form-error submit-error" role="alert">{error}</p> : null}
+      </form>
+    </main>
+  );
+}
+
+function Analyzing({ details, activeStep }: { details: InterviewDetails; activeStep: number }) {
+  return (
+    <main className="page analysis-page" aria-live="polite" aria-busy="true">
+      <section className="analysis-panel">
+        <p className="eyebrow">Preparing your interview</p>
+        <h1>Building a focused preparation for {details.role}.</h1>
+        <p className="analysis-context">{details.company} · {details.stage}</p>
+        <ol className="analysis-steps">
+          {analysisSteps.map((step, index) => (
+            <li className={index < activeStep ? "complete" : index === activeStep ? "active" : ""} key={step}>
+              <span aria-hidden="true">{index < activeStep ? "✓" : index + 1}</span>
+              <p><strong>{step}</strong>{step === "Reviewing your CV" && !details.cvFileName ? <small>No CV added — continuing with role and vacancy evidence.</small> : null}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </main>
+  );
+}
+
+function PreparationHeader({ analysis }: { analysis: InterviewAnalysis }) {
+  return (
+    <div className="preparation-header">
+      <p className="eyebrow">Your interview preparation</p>
+      <div><h1>{analysis.details.company}</h1><p>{analysis.details.role}<span aria-hidden="true">·</span>{analysis.details.stage}</p></div>
     </div>
   );
 }
 
-const reportMetrics = [
-  ["Technical depth", 86],
-  ["Structure and clarity", 78],
-  ["Example quality", 72],
-  ["Communication", 84],
-] as const;
-
-function Report({ context, onRestart }: { context: PreparationContext; onRestart: () => void }) {
+function CoverageNotice({ analysis }: { analysis: InterviewAnalysis }) {
   return (
-    <div className="page flow-page report-page">
-      <PageHeading
-        step="Step 4 of 4 · Feedback"
-        title="A strong result with clear next steps."
-        description={`Feedback from the ${context.role} practice for ${context.company}.`}
-      />
+    <section className="coverage-notice" aria-label="Company-specific data coverage">
+      <div><p>Company-specific data</p><strong>{analysis.companyCoverage}</strong></div>
+      <p>{analysis.companyCoverageNote}</p>
+    </section>
+  );
+}
 
-      <section className="report-summary">
-        <div><strong>82</strong><span>Readiness score</span></div>
-        <p>You showed solid technical judgment. Stronger metrics and clearer trade-off explanations will make your answers more convincing.</p>
+function Overview({ analysis, onQuestions, onPractice }: { analysis: InterviewAnalysis; onQuestions: () => void; onPractice: () => void }) {
+  return (
+    <main className="page prepared-page">
+      <PreparationHeader analysis={analysis} />
+      <CoverageNotice analysis={analysis} />
+
+      <section className="focus-section" aria-labelledby="focus-heading">
+        <div className="section-heading"><div><p className="eyebrow">Likely focus</p><h2 id="focus-heading">What this interview may explore</h2></div><p>Based on the role, vacancy requirements and available evidence.</p></div>
+        <div className="focus-list">
+          {analysis.focusAreas.map((area) => <div key={area.label}><span>{area.label}</span><strong>{area.priority}</strong></div>)}
+        </div>
       </section>
 
-      <section className="metrics-card" aria-label="Performance scores">
-        {reportMetrics.map(([label, value]) => (
-          <div key={label}><p><span>{label}</span><strong>{value}%</strong></p><div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value}><span style={{ width: `${value}%` }} /></div></div>
-        ))}
+      <section className="next-actions" aria-labelledby="choose-heading">
+        <div className="section-heading"><div><p className="eyebrow">Choose how to prepare</p><h2 id="choose-heading">Your questions are ready</h2></div></div>
+        <div className="action-options">
+          <button type="button" onClick={onQuestions}><span>01</span><p><strong>View Questions</strong><small>Review likely questions and why each one matters. You do not need to answer.</small></p><b aria-hidden="true">→</b></button>
+          <button type="button" onClick={onPractice}><span>02</span><p><strong>Practice Interview</strong><small>Answer selected questions and receive realistic follow-ups.</small></p><b aria-hidden="true">→</b></button>
+        </div>
       </section>
+    </main>
+  );
+}
 
-      <div className="feedback-grid">
-        <section className="content-card"><p className="overline">What worked</p><h2>Keep doing this</h2><ul className="plain-list"><li>Break problems into measurable stages</li><li>Protect customers before investigating deeply</li><li>Communicate ownership and next actions</li></ul></section>
-        <section className="content-card"><p className="overline">What to improve</p><h2>Make the answer sharper</h2><ul className="plain-list"><li>Add a measurable business result</li><li>Compare the alternatives you rejected</li><li>Clarify your individual contribution</li></ul></section>
+function QuestionRow({ question, index, onPractice }: { question: PreparationQuestion; index: number; onPractice: (questionId: string) => void }) {
+  const [openPanel, setOpenPanel] = useState<"reason" | "approach" | null>(null);
+  return (
+    <article className="question-row">
+      <span className="question-number">{String(index + 1).padStart(2, "0")}</span>
+      <div className="question-content">
+        <h3>{question.question}</h3>
+        <p className="source-line">{question.sources.join(" · ")}</p>
+        <div className="question-actions">
+          <button type="button" aria-expanded={openPanel === "reason"} onClick={() => setOpenPanel(openPanel === "reason" ? null : "reason")}>Why this question?</button>
+          <button type="button" aria-expanded={openPanel === "approach"} onClick={() => setOpenPanel(openPanel === "approach" ? null : "approach")}>How should I approach this?</button>
+          <button className="practice-link" type="button" onClick={() => onPractice(question.id)}>Practice <span aria-hidden="true">→</span></button>
+        </div>
+        {openPanel === "reason" ? <div className="question-detail"><strong>Why it matters</strong><p>{question.reason}</p></div> : null}
+        {openPanel === "approach" ? <div className="question-detail"><strong>A strong answer should cover</strong><ul>{question.approach.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
       </div>
+    </article>
+  );
+}
 
-      <div className="action-row"><p>Recommended next step: one system-design drill</p><button className="primary-button" onClick={onRestart} type="button">Start another practice <span aria-hidden="true">→</span></button></div>
-    </div>
+function Questions({ analysis, onPractice }: { analysis: InterviewAnalysis; onPractice: (questionId?: string) => void }) {
+  const categories = useMemo(() => Array.from(new Set(analysis.questions.map((question) => question.category))), [analysis.questions]);
+  const [category, setCategory] = useState<"All questions" | QuestionCategory>("All questions");
+  const displayed = category === "All questions" ? analysis.questions : analysis.questions.filter((question) => question.category === category);
+  return (
+    <main className="page prepared-page questions-page">
+      <PreparationHeader analysis={analysis} />
+      <div className="section-heading question-heading"><div><p className="eyebrow">Preparation sheet</p><h2>Likely Interview Questions</h2></div><p>Selected from the role, job requirements, your CV and available interview signals.</p></div>
+
+      {analysis.cvAreas.length ? (
+        <section className="cv-insight" aria-labelledby="cv-insight-heading">
+          <div><p className="eyebrow">CV review</p><h2 id="cv-insight-heading">CV areas likely to be explored</h2></div>
+          <div>{analysis.cvAreas.map((area) => <p key={area.label}><span>{area.label}</span><strong>{area.priority}</strong></p>)}</div>
+        </section>
+      ) : (
+        <section className="cv-unavailable"><strong>No CV added</strong><p>Your questions are based on the vacancy, role, industry and interview stage. You can start a new preparation to add a CV.</p></section>
+      )}
+
+      <div className="question-filters" role="group" aria-label="Filter questions by category">
+        {(["All questions", ...categories] as const).map((item) => <button className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)} type="button">{item}</button>)}
+      </div>
+      <section className="question-list" aria-label="Likely interview questions">
+        {displayed.map((question) => <QuestionRow key={question.id} question={question} index={analysis.questions.indexOf(question)} onPractice={onPractice} />)}
+      </section>
+    </main>
+  );
+}
+
+function ChoiceGroup<T extends string>({ label, options, value, onChange }: { label: string; options: T[]; value: T; onChange: (value: T) => void }) {
+  return (
+    <fieldset className="choice-group"><legend>{label}</legend><div>{options.map((option) => <button aria-pressed={value === option} className={value === option ? "selected" : ""} key={option} type="button" onClick={() => onChange(option)}>{option}</button>)}</div></fieldset>
+  );
+}
+
+function PracticeSetup({ analysis, onStart }: { analysis: InterviewAnalysis; onStart: (mode: PracticeMode, focus: PracticeFocus, duration: Duration) => void }) {
+  const [mode, setMode] = useState<PracticeMode>("Practice");
+  const [focus, setFocus] = useState<PracticeFocus>("Full Interview");
+  const [duration, setDuration] = useState<Duration>("30 min");
+  return (
+    <main className="page prepared-page practice-setup-page">
+      <PreparationHeader analysis={analysis} />
+      <div className="page-heading short-heading"><p className="eyebrow">Practice interview</p><h2>Choose how you want to practise.</h2><p>Answer questions selected specifically for this interview and receive relevant follow-ups.</p></div>
+      <section className="practice-options">
+        <fieldset className="mode-choice"><legend>Choose mode</legend><div>
+          <button aria-pressed={mode === "Real Interview"} className={mode === "Real Interview" ? "selected" : ""} onClick={() => setMode("Real Interview")} type="button"><strong>Real Interview</strong><small>Feedback is provided at the end.</small></button>
+          <button aria-pressed={mode === "Practice"} className={mode === "Practice" ? "selected" : ""} onClick={() => setMode("Practice")} type="button"><strong>Practice</strong><small>Receive feedback while practising.</small></button>
+        </div></fieldset>
+        <ChoiceGroup label="Focus" options={["Full Interview", "Technical", "HR / Behavioral", "CV Deep Dive"]} value={focus} onChange={setFocus} />
+        <ChoiceGroup label="Duration" options={["15 min", "30 min", "45 min"]} value={duration} onChange={setDuration} />
+        <div className="practice-start"><p>{analysis.questions.length} tailored questions available</p><button className="button button-primary" onClick={() => onStart(mode, focus, duration)} type="button">Start Interview <span aria-hidden="true">→</span></button></div>
+      </section>
+    </main>
+  );
+}
+
+function PracticeActive({
+  analysis,
+  mode,
+  questions,
+  initialQuestionId,
+  onFinish,
+}: {
+  analysis: InterviewAnalysis;
+  mode: PracticeMode;
+  questions: PreparationQuestion[];
+  initialQuestionId: string | null;
+  onFinish: (completed: number) => void;
+}) {
+  const initialIndex = Math.max(0, initialQuestionId ? questions.findIndex((question) => question.id === initialQuestionId) : 0);
+  const [index, setIndex] = useState(initialIndex);
+  const [answer, setAnswer] = useState("");
+  const [followUp, setFollowUp] = useState(false);
+  const [feedback, setFeedback] = useState(false);
+  const current = questions[index];
+  const completed = index + (followUp ? 1 : 0);
+
+  function advance() {
+    if (!followUp && current.followUp) {
+      setFollowUp(true);
+    } else if (index >= questions.length - 1) {
+      onFinish(questions.length);
+      return;
+    } else {
+      setIndex((value) => value + 1);
+      setFollowUp(false);
+    }
+    setAnswer("");
+    setFeedback(false);
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (answer.trim().length < 30) return;
+    if (mode === "Practice") setFeedback(true);
+    else advance();
+  }
+
+  return (
+    <main className="page active-interview-page">
+      <div className="active-context"><button type="button" onClick={() => onFinish(completed)}>End Interview</button><p><strong>{analysis.details.company} · {analysis.details.role}</strong><span>{analysis.details.stage} · {mode}</span></p><p>Question {index + 1} of {questions.length}</p></div>
+      <div className="interview-progress" aria-label={`Question ${index + 1} of ${questions.length}`}><span style={{ width: `${((index + 1) / questions.length) * 100}%` }} /></div>
+      <section className="interview-question" aria-live="polite">
+        <p className="interviewer-label">Interviewer</p>
+        <h1>{followUp ? current.followUp : current.question}</h1>
+        {!followUp ? <p className="source-line">Selected from {current.sources.join(" · ")}</p> : <p className="source-line">Follow-up based on this topic</p>}
+      </section>
+      <form className="answer-form" onSubmit={submit}>
+        <label htmlFor="candidate-answer">Your answer</label>
+        <textarea id="candidate-answer" maxLength={2500} rows={8} autoFocus placeholder="Write your answer as you would say it in the interview..." value={answer} onChange={(event) => setAnswer(event.target.value)} disabled={feedback} />
+        <div className="answer-footer"><span>{answer.length} / 2,500</span><button className="button button-primary" disabled={answer.trim().length < 30 || feedback} type="submit">Submit Answer</button></div>
+      </form>
+      {feedback ? (
+        <section className="inline-feedback" aria-live="polite">
+          <div><p className="eyebrow">Practice feedback</p><h2>Strengthen the evidence in your answer.</h2></div>
+          <div className="feedback-columns"><div><strong>Strong points</strong><ul><li>You gave enough context to follow your reasoning.</li><li>Your answer addressed the core question directly.</li></ul></div><div><strong>Improve</strong><ul><li>Make your personal contribution explicit.</li><li>Add one measurable result or decision criterion.</li></ul></div></div>
+          <div className="likely-follow-up"><span>Likely follow-up</span><p>“{current.followUp}”</p></div>
+          <button className="button button-primary" type="button" onClick={advance}>Continue <span aria-hidden="true">→</span></button>
+        </section>
+      ) : null}
+    </main>
+  );
+}
+
+function Report({ analysis, mode, completed, onQuestions, onRestart }: { analysis: InterviewAnalysis; mode: PracticeMode; completed: number; onQuestions: () => void; onRestart: () => void }) {
+  return (
+    <main className="page prepared-page report-page">
+      <PreparationHeader analysis={analysis} />
+      <section className="report-intro"><p className="eyebrow">Interview complete</p><h2>Your preparation has a clear next step.</h2><p>You completed {completed} question{completed === 1 ? "" : "s"} in {mode.toLocaleLowerCase("en-US")} mode. Review the evidence behind each answer before your real interview.</p></section>
+      <div className="report-grid">
+        <section><p className="eyebrow">What worked</p><h3>Keep doing this</h3><ul><li>Address the question before adding background.</li><li>Explain the reasoning behind technical choices.</li><li>Connect your experience to the target role.</li></ul></section>
+        <section><p className="eyebrow">Improve next</p><h3>Make each answer more credible</h3><ul><li>Quantify outcomes wherever possible.</li><li>Compare at least one realistic alternative.</li><li>Clarify what you personally owned.</li></ul></section>
+      </div>
+      <section className="recommended-next"><div><span>Recommended next step</span><strong>Review the likely questions and prepare two measurable examples.</strong></div><button className="button button-secondary" onClick={onQuestions} type="button">View Questions</button><button className="button button-primary" onClick={onRestart} type="button">Practice Again</button></section>
+    </main>
   );
 }
 
 export default function HomePage() {
   const [view, setView] = useState<View>("home");
-  const [context, setContext] = useState<PreparationContext>(defaultContext);
+  const [details, setDetails] = useState<InterviewDetails>(initialDetails);
+  const [analysis, setAnalysis] = useState<InterviewAnalysis | null>(null);
+  const [analysisStep, setAnalysisStep] = useState(0);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>("Practice");
+  const [practiceQuestions, setPracticeQuestions] = useState<PreparationQuestion[]>([]);
+  const [initialQuestionId, setInitialQuestionId] = useState<string | null>(null);
+  const [completedQuestions, setCompletedQuestions] = useState(0);
 
-  function completeSetup(value: PreparationContext) {
-    setContext(value);
-    setView("profile");
+  async function analyze() {
+    setAnalysisError(null);
+    setAnalysisStep(0);
+    setView("analyzing");
+    try {
+      const result = await prepareInterview({ ...details, company: details.company.trim(), role: details.role.trim(), jobDescription: details.jobDescription.trim(), jobUrl: details.jobUrl.trim() }, setAnalysisStep);
+      setAnalysis(result);
+      setView("overview");
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "We could not prepare this interview. Please try again.");
+      setView("form");
+    }
+  }
+
+  function beginPractice(mode: PracticeMode, focus: PracticeFocus, _duration: Duration, questionId: string | null = null) {
+    if (!analysis) return;
+    let selected = analysis.questions;
+    if (focus === "Technical") selected = selected.filter((question) => ["Technical Questions", "System Design"].includes(question.category));
+    if (focus === "HR / Behavioral") selected = selected.filter((question) => question.category === "HR / Recruiter");
+    if (focus === "CV Deep Dive") selected = selected.filter((question) => question.category === "CV Questions");
+    if (!selected.length) selected = analysis.questions;
+    setPracticeMode(mode);
+    setPracticeQuestions(selected);
+    setInitialQuestionId(questionId);
+    setView("practice-active");
+  }
+
+  function practiceOne(questionId?: string) {
+    beginPractice("Practice", "Full Interview", "15 min", questionId ?? null);
+  }
+
+  function finishPractice(completed: number) {
+    setCompletedQuestions(completed);
+    setView("report");
   }
 
   return (
     <>
-      <Header view={view} onNavigate={setView} />
-      {view === "home" && <Home onStart={() => setView("setup")} />}
-      {view === "setup" && <Setup context={context} onContinue={completeSetup} />}
-      {view === "profile" && <Profile context={context} onStart={() => setView("interview")} />}
-      {view === "interview" && <Interview context={context} onFinish={() => setView("report")} />}
-      {view === "report" && <Report context={context} onRestart={() => setView("setup")} />}
+      <Header analysis={analysis} activeView={view} onNavigate={setView} />
+      {view === "home" ? <Home recent={analysis} onStart={() => setView("form")} onOpen={() => setView("overview")} /> : null}
+      {view === "form" ? <InterviewForm value={details} error={analysisError} onChange={setDetails} onSubmit={analyze} /> : null}
+      {view === "analyzing" ? <Analyzing details={details} activeStep={analysisStep} /> : null}
+      {view === "overview" && analysis ? <Overview analysis={analysis} onQuestions={() => setView("questions")} onPractice={() => setView("practice-setup")} /> : null}
+      {view === "questions" && analysis ? <Questions analysis={analysis} onPractice={practiceOne} /> : null}
+      {view === "practice-setup" && analysis ? <PracticeSetup analysis={analysis} onStart={beginPractice} /> : null}
+      {view === "practice-active" && analysis ? <PracticeActive key={`${analysis.id}-${initialQuestionId}-${practiceMode}`} analysis={analysis} mode={practiceMode} questions={practiceQuestions.length ? practiceQuestions : analysis.questions} initialQuestionId={initialQuestionId} onFinish={finishPractice} /> : null}
+      {view === "report" && analysis ? <Report analysis={analysis} mode={practiceMode} completed={completedQuestions} onQuestions={() => setView("questions")} onRestart={() => setView("practice-setup")} /> : null}
     </>
   );
 }

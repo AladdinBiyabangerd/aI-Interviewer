@@ -31,10 +31,12 @@ For a single detailed account of everything implemented from the beginning, see 
 
 ## Frontend MVP demo
 
-An English, responsive boss-demo is available in [`frontend`](frontend/README.md).
-It covers setup, simulated AI analysis, a three-question interview, and a final
-scorecard with a seven-day plan. The current UI uses synthetic sample data and
-does not send a real CV to OpenAI.
+An English, responsive product demo is available in [`frontend`](frontend/README.md).
+It implements the focused candidate journey: one interview-details form, transparent
+analysis states, an evidence-labeled likely-question sheet, Real Interview and Practice
+modes, relevant follow-ups, and a concise final report. The frontend keeps the pending
+analysis API behind one adapter; without a configured API origin it uses an honest local
+preview path and does not claim to have parsed the CV or found private company questions.
 
 ```powershell
 cd frontend
