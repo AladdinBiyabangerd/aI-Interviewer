@@ -374,6 +374,15 @@ class Settings(BaseSettings):
             return normalized.lower()
         return normalized
 
+    @field_validator("openai_api_key", mode="before")
+    @classmethod
+    def normalize_empty_openai_api_key(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        if isinstance(value, SecretStr) and not value.get_secret_value().strip():
+            return None
+        return value
+
     @field_validator("openai_api_key")
     @classmethod
     def validate_openai_api_key(cls, value: SecretStr | None) -> SecretStr | None:

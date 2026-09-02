@@ -78,6 +78,12 @@ def test_release_artifact_contains_exactly_the_expected_head() -> None:
     assert verify_migration_artifact() == EXPECTED_SCHEMA_REVISION
 
 
+def test_release_image_verifier_pins_the_application_schema_head() -> None:
+    verifier = Path("scripts/verify-release-image.ps1").read_text(encoding="utf-8")
+
+    assert f'$expectedSchemaRevision = "{EXPECTED_SCHEMA_REVISION}"' in verifier
+
+
 def test_release_artifact_rejects_an_unexpected_head(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

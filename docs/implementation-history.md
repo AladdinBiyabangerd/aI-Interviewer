@@ -140,8 +140,9 @@ amma modulların məsuliyyəti ayrıdır:
 - `file_security`: byte validation, object storage, scanner və file lifecycle;
 - `reliability`: staging baseline evidence modeli və CLI evaluator.
 
-Gələcək profiling, knowledge, retrieval, blueprint, session, interviewer, evaluator,
-skill-state və reporting modulları hələ yaradılmayıb.
+Profiling tamamlanmaq üzrədir; `knowledge` və `retrieval` üçün dormant question-
+intelligence foundation yaradılıb. Tam blueprint API-si, session, interviewer,
+evaluator, skill-state və reporting modulları hələ yaradılmayıb.
 
 ### 4.2 Deterministic orchestration prinsipi
 
@@ -2221,4 +2222,36 @@ dörd named approval hələ D2.2b2-də qalır.
 
 Tam `./scripts/verify.ps1` nəticəsi: `632 passed, 1 skipped`, `95.64%` combined branch
 coverage, Ruff check/format `226` fayl, strict mypy `89` source fayl, sıfırdan `12`
+PostgreSQL migration, dependency compatibility və vulnerability audit uğurludur.
+
+## 22. Evidence-ranked question intelligence foundation
+
+Məhsulun əsas dəyəri UI deyil, real müsahibəyə faydalı sual sahələrinin seçilməsidir.
+Buna görə `knowledge` və `retrieval` sərhədləri ayrıca yaradıldı. Source rights/provenance,
+normalized evidence, role competency graph, question concept və company fingerprint strict
+contract-larla modelləşdirildi; proprietary sual mətnini əsas data obyekti kimi saxlamaq
+qadağandır.
+
+Data/AI graph-ında production RAG tələbi ingestion-dan evaluation, hallucination, latency,
+monitoring və scaling-ə qədər genişlənir. CV claim ID-ləri eyni graph üzərindən deep-probe
+siqnalı verir. Banking, financial services, e-commerce və telecom pattern-ləri company
+evidence kimi deyil, ayrıca `industry_derived` provenance ilə işləyir. Ranker JD, role,
+company, round, seniority, industry, CV, source trust, frequency, recency və corroboration
+komponentlərini configurable çəkilərlə hesablayır; coverage allocator isə competency
+paylanmasını və redundancy limitini qoruyur.
+
+Yeddi PostgreSQL cədvəli source → evidence → concept/fingerprint lineage-ni saxlayır.
+Versioned authored concept catalog database-ə idempotent sync olunur. High company
+specificity ən azı iki independent source group və official evidence tələb edir;
+metadata-only/pending/prohibited/withdrawn source derived retrieval-ə daxil olmur.
+
+[ADR 0029](adr/0029-evidence-ranked-question-intelligence-foundation.md) bu qərarı,
+[status record](status/question-intelligence-foundation.md) isə hazır və qalan hissələri
+sabitləyir. Bu foundation OpenAI/network çağırışı etmir və D2.2b2, 1C və ya Phase 2-ni
+complete göstərmir. Real corpus approval, Source Policy Registry, production ingestion,
+hybrid retrieval, labeled precision-at-K, feedback flywheel və authenticated blueprint
+API hələ pending-dir.
+
+Tam `./scripts/verify.ps1` nəticəsi: `648 passed, 1 skipped`, `95.61%` combined branch
+coverage, Ruff check/format `243` fayl, strict mypy `99` source fayl, sıfırdan `13`
 PostgreSQL migration, dependency compatibility və vulnerability audit uğurludur.

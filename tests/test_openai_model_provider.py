@@ -353,6 +353,12 @@ def test_openai_settings_require_scoped_secret_and_auto_build_adapter() -> None:
     assert _FAKE_KEY not in repr(settings)
 
 
+def test_blank_openai_environment_value_is_treated_as_not_configured() -> None:
+    settings = Settings(_env_file=None, openai_api_key="  ")
+
+    assert settings.openai_api_key is None
+
+
 def test_openai_settings_load_secret_file_and_reject_ambiguous_or_malformed_key(
     tmp_path: Path,
 ) -> None:
