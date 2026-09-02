@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 const title = "InterviewOS — Structured interview preparation";
 const description =
-  "Turn a resume and job description into a focused practice session, evidence-based feedback, and a clear improvement plan.";
+  "Practice role-specific interview questions and receive clear, evidence-based feedback.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -22,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
     ? "https"
     : "http";
   const origin = `${protocol}://${host}`;
-  const image = `${origin}/og-professional-light.png`;
+  const image = `${origin}/og-minimal-blue.png`;
   return {
     metadataBase: new URL(origin),
     title,
@@ -33,5 +32,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body></html>;
+  return <html lang="en"><body className={geistSans.variable}>{children}</body></html>;
 }

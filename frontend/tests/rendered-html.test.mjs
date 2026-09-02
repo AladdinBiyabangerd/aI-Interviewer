@@ -15,11 +15,11 @@ test("server-renders the English interview MVP", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="en">/i);
   assert.match(html, /InterviewOS — Structured interview preparation/i);
-  assert.match(html, /Walk into the interview/);
-  assert.match(html, /Start product walkthrough/);
-  assert.match(html, /Guided demo/);
-  assert.match(html, /Kapital Bank/);
-  assert.match(html, /Senior Backend Developer/);
-  assert.match(html, /og-professional-light\.png/);
+  assert.match(html, /Practice the questions that matter/);
+  assert.match(html, /Start interview/);
+  assert.match(html, /AI-assisted demo/);
+  assert.match(html, /A clear path from role to feedback/);
+  assert.match(html, /Context.*Brief.*Practice.*Feedback/s);
+  assert.match(html, /og-minimal-blue\.png/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
