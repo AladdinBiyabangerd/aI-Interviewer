@@ -420,7 +420,10 @@ def test_database_url_accepts_the_standard_scheme_like_the_migration_tool_does(
     var, not fail to start on an input the migration tool considers valid.
     """
     settings = Settings(_env_file=None, database_url=f"{scheme}app:password@localhost/app")
-    assert settings.database_url.get_secret_value() == "postgresql+psycopg://app:password@localhost/app"
+    assert (
+        settings.database_url.get_secret_value()
+        == "postgresql+psycopg://app:password@localhost/app"
+    )
 
 
 def test_secret_file_coordinates_are_exclusive_and_validated(tmp_path: Path) -> None:
