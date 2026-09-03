@@ -3,6 +3,7 @@
 import { ChangeEvent, createContext, FormEvent, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  AnalysisProgress,
   InterviewAnalysis,
   InterviewDetails,
   InterviewLanguage,
@@ -365,8 +366,20 @@ function InterviewForm({
   );
 }
 
-function Analyzing({ details, activeStep }: { details: InterviewDetails; activeStep: number }) {
+function elapsedClock(elapsedMs: number): string {
+  const totalSeconds = Math.floor(elapsedMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function Analyzing({ details, progress }: { details: InterviewDetails; progress: AnalysisProgress }) {
   const { t } = useInterfaceLanguage();
+  const lastStep = t.analysis.steps.length - 1;
+  const waitingOnLastVisibleStep = progress.stepIndex === lastStep - 1;
+  const waitingLine = progress.phase === "reviewing_cv"
+    ? t.analysis.reviewingCv
+    : t.analysis.waitingLines[Math.floor(progress.elapsedMs / 6_000) % t.analysis.waitingLines.length];
   return (
     <main className="page analysis-page" aria-live="polite" aria-busy="true">
       <section className="analysis-panel">
@@ -375,12 +388,20 @@ function Analyzing({ details, activeStep }: { details: InterviewDetails; activeS
         <p className="analysis-context">{details.company} · {t.stageLabels[details.stage]}</p>
         <ol className="analysis-steps">
           {t.analysis.steps.map((step, index) => (
-            <li className={index < activeStep ? "complete" : index === activeStep ? "active" : ""} key={step}>
-              <span aria-hidden="true">{index < activeStep ? "✓" : index + 1}</span>
-              <p><strong>{step}</strong>{index === 2 && !details.cvFileName ? <small>{t.analysis.noCv}</small> : null}</p>
+            <li className={index < progress.stepIndex ? "complete" : index === progress.stepIndex ? "active" : ""} key={step}>
+              <span aria-hidden="true">{index < progress.stepIndex ? "✓" : index + 1}</span>
+              <p>
+                <strong>{step}</strong>
+                {index === 2 && !details.cvFileName ? <small>{t.analysis.noCv}</small> : null}
+                {index === progress.stepIndex && waitingOnLastVisibleStep ? <small>{waitingLine}</small> : null}
+              </p>
             </li>
           ))}
         </ol>
+        <p className="analysis-elapsed">
+          {t.analysis.elapsed(elapsedClock(progress.elapsedMs))}
+          {progress.slow ? <span> · {t.analysis.slow}</span> : null}
+        </p>
       </section>
     </main>
   );
@@ -559,12 +580,20 @@ function PracticeSetup({ analysis, error, onStart }: { analysis: InterviewAnalys
   );
 }
 
+function formatCountdown(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 function PracticeActive({
   analysis,
   mode,
   questions,
   sessionId,
   initialQuestionId,
+  durationMinutes,
   onFinish,
 }: {
   analysis: InterviewAnalysis;
@@ -572,6 +601,7 @@ function PracticeActive({
   questions: PreparationQuestion[];
   sessionId: string;
   initialQuestionId: string | null;
+  durationMinutes: number;
   onFinish: (completed: number) => void;
 }) {
   const { t } = useInterfaceLanguage();
@@ -584,14 +614,30 @@ function PracticeActive({
   const [pendingResult, setPendingResult] = useState<Awaited<ReturnType<typeof submitPracticeAnswer>> | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [answeredTurns, setAnsweredTurns] = useState(0);
+  const [expectedTurns, setExpectedTurns] = useState(questions.length);
+  const [remainingMs, setRemainingMs] = useState(durationMinutes * 60_000);
+  const deadlineRef = useRef<number | null>(null);
   const current = questions[index];
-  const completed = index + (followUp ? 1 : 0);
+
+  useEffect(() => {
+    deadlineRef.current = Date.now() + durationMinutes * 60_000;
+    const interval = window.setInterval(() => {
+      const deadline = deadlineRef.current;
+      setRemainingMs(deadline === null ? 0 : Math.max(0, deadline - Date.now()));
+    }, 1_000);
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function advance(result: Awaited<ReturnType<typeof submitPracticeAnswer>>) {
+    const nextAnswered = answeredTurns + 1;
+    setAnsweredTurns(nextAnswered);
     if (result.followUp) {
+      setExpectedTurns((value) => value + 1);
       setFollowUp(result.followUp);
     } else if (result.sessionComplete) {
-      onFinish(questions.length);
+      onFinish(nextAnswered);
       return;
     } else if (result.nextQuestion) {
       setIndex((value) => value + 1);
@@ -622,10 +668,14 @@ function PracticeActive({
     }
   }
 
+  const currentTurn = Math.min(answeredTurns + 1, expectedTurns);
+  const progressLabel = t.active.questionProgress(currentTurn, expectedTurns);
+  const timeExpired = remainingMs <= 0;
+
   return (
     <main className="page active-interview-page">
-      <div className="active-context"><button disabled={completed === 0 || processing} type="button" onClick={() => onFinish(completed)}>{t.active.end}</button><p><strong>{analysis.details.company} · {analysis.details.role}</strong><span>{t.stageLabels[analysis.details.stage]} · {t.practice.modeLabels[mode]}</span></p><p>{t.active.questionProgress(index + 1, questions.length)}</p></div>
-      <div className="interview-progress" aria-label={t.active.questionProgress(index + 1, questions.length)}><span style={{ width: `${((index + 1) / questions.length) * 100}%` }} /></div>
+      <div className="active-context"><button disabled={answeredTurns === 0 || processing} type="button" onClick={() => onFinish(answeredTurns)}>{t.active.end}</button><p><strong>{analysis.details.company} · {analysis.details.role}</strong><span>{t.stageLabels[analysis.details.stage]} · {t.practice.modeLabels[mode]}</span></p><p>{progressLabel}<span className={timeExpired ? "time-remaining expired" : "time-remaining"}>{timeExpired ? t.active.timeUp : t.active.timeRemaining(formatCountdown(remainingMs))}</span></p></div>
+      <div className="interview-progress" aria-label={progressLabel}><span style={{ width: `${(answeredTurns / expectedTurns) * 100}%` }} /></div>
       <section className="interview-question" aria-live="polite">
         <p className="interviewer-label">{t.active.interviewer}</p>
         <h1>{followUp ?? current.question}</h1>
@@ -641,7 +691,6 @@ function PracticeActive({
         <section className="inline-feedback" aria-live="polite">
           <div><p className="eyebrow">{t.active.feedback}</p><h2>{t.active.feedbackTitle}</h2></div>
           <div className="feedback-columns"><div><strong>{t.active.strongPoints}</strong><ul>{feedback.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div><div><strong>{t.active.improve}</strong><ul>{feedback.improvements.map((item) => <li key={item}>{item}</li>)}</ul></div></div>
-          {pendingResult?.followUp ? <div className="likely-follow-up"><span>{t.active.likelyFollowUp}</span><p>“{pendingResult.followUp}”</p></div> : null}
           <button className="button button-primary" type="button" onClick={() => pendingResult && advance(pendingResult)}>{t.active.continue} <span aria-hidden="true">→</span></button>
         </section>
       ) : null}
@@ -683,10 +732,11 @@ export default function HomePage() {
   const [view, setView] = useState<View>("home");
   const [details, setDetails] = useState<InterviewDetails>(initialDetails);
   const [analysis, setAnalysis] = useState<InterviewAnalysis | null>(null);
-  const [analysisStep, setAnalysisStep] = useState(0);
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress>({ stepIndex: 0, phase: null, elapsedMs: 0, slow: false });
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [practiceMode, setPracticeMode] = useState<PracticeMode>("Practice");
   const [practiceQuestions, setPracticeQuestions] = useState<PreparationQuestion[]>([]);
+  const [practiceDurationMinutes, setPracticeDurationMinutes] = useState(15);
   const [initialQuestionId, setInitialQuestionId] = useState<string | null>(null);
   const [practiceSessionId, setPracticeSessionId] = useState<string | null>(null);
   const [practiceError, setPracticeError] = useState<string | null>(null);
@@ -713,10 +763,10 @@ export default function HomePage() {
 
   async function analyze() {
     setAnalysisError(null);
-    setAnalysisStep(0);
+    setAnalysisProgress({ stepIndex: 0, phase: null, elapsedMs: 0, slow: false });
     setView("analyzing");
     try {
-      const result = await prepareInterview({ ...details, company: details.company.trim(), role: details.role.trim(), jobDescription: details.jobDescription.trim(), jobUrl: details.jobUrl.trim() }, setAnalysisStep);
+      const result = await prepareInterview({ ...details, company: details.company.trim(), role: details.role.trim(), jobDescription: details.jobDescription.trim(), jobUrl: details.jobUrl.trim() }, setAnalysisProgress);
       setAnalysis(result);
       setView("overview");
     } catch {
@@ -750,6 +800,7 @@ export default function HomePage() {
     }
     setPracticeMode(mode);
     setPracticeQuestions(selected);
+    setPracticeDurationMinutes(Number.parseInt(duration, 10));
     setInitialQuestionId(questionId);
     setView("practice-active");
   }
@@ -777,11 +828,11 @@ export default function HomePage() {
       <Header analysis={analysis} activeView={view} onNavigate={setView} />
       {view === "home" ? <Home recent={analysis} onStart={() => setView("form")} onOpen={() => setView("overview")} /> : null}
       {view === "form" ? <InterviewForm value={details} error={analysisError} onChange={setDetails} onSubmit={analyze} /> : null}
-      {view === "analyzing" ? <Analyzing details={details} activeStep={analysisStep} /> : null}
+      {view === "analyzing" ? <Analyzing details={details} progress={analysisProgress} /> : null}
       {view === "overview" && analysis ? <Overview analysis={analysis} onQuestions={() => setView("questions")} onPractice={() => setView("practice-setup")} /> : null}
       {view === "questions" && analysis ? <Questions analysis={analysis} onPractice={practiceOne} /> : null}
       {view === "practice-setup" && analysis ? <PracticeSetup analysis={analysis} error={practiceError} onStart={beginPractice} /> : null}
-      {view === "practice-active" && analysis && practiceSessionId ? <PracticeActive key={`${analysis.id}-${initialQuestionId}-${practiceMode}`} analysis={analysis} mode={practiceMode} questions={practiceQuestions.length ? practiceQuestions : analysis.questions} sessionId={practiceSessionId} initialQuestionId={initialQuestionId} onFinish={finishPractice} /> : null}
+      {view === "practice-active" && analysis && practiceSessionId ? <PracticeActive key={practiceSessionId} analysis={analysis} mode={practiceMode} questions={practiceQuestions.length ? practiceQuestions : analysis.questions} sessionId={practiceSessionId} initialQuestionId={initialQuestionId} durationMinutes={practiceDurationMinutes} onFinish={finishPractice} /> : null}
       {view === "report-loading" ? <ReportLoading error={reportError} onRetry={() => finishPractice(completedQuestions)} /> : null}
       {view === "report" && analysis && practiceReport ? <Report analysis={analysis} mode={practiceMode} completed={completedQuestions} report={practiceReport} onQuestions={() => setView("questions")} onRestart={() => { setPracticeReport(null); setPracticeSessionId(null); setView("practice-setup"); }} /> : null}
     </InterfaceLanguageContext.Provider>

@@ -191,6 +191,10 @@ export const uiCopy = {
       title: (role: string) => `Building a focused preparation for ${role}.`,
       steps: ["Analyzing the role", "Reading job requirements", "Reviewing your CV", "Researching relevant interview signals", "Preparing likely questions"],
       noCv: "No CV added — continuing with role and vacancy evidence.",
+      waitingLines: ["Still researching public sources…", "Cross-checking company signals…", "Drafting the most likely questions…"],
+      reviewingCv: "Research complete — reviewing your CV now…",
+      elapsed: (time: string) => `${time} elapsed`,
+      slow: "This is taking longer than usual, but we're still working on it.",
     },
     preparation: {
       eyebrow: "Your interview preparation",
@@ -267,8 +271,9 @@ export const uiCopy = {
       strongItems: ["You gave enough context to follow your reasoning.", "Your answer addressed the core question directly."],
       improve: "Improve",
       improveItems: ["Make your personal contribution explicit.", "Add one measurable result or decision criterion."],
-      likelyFollowUp: "Likely follow-up",
       continue: "Continue",
+      timeRemaining: (time: string) => `${time} remaining`,
+      timeUp: "Time's up — wrap up when you're ready.",
     },
     report: {
       complete: "Interview complete",
@@ -396,6 +401,10 @@ export const uiCopy = {
       title: (role: string) => `${role} vəzifəsi üçün fokuslanmış hazırlıq yaradılır.`,
       steps: ["Vəzifə təhlil edilir", "Vakansiya tələbləri oxunur", "CV yoxlanılır", "Uyğun müsahibə siqnalları araşdırılır", "Ehtimal olunan suallar hazırlanır"],
       noCv: "CV əlavə edilməyib — vəzifə və vakansiya məlumatları ilə davam edirik.",
+      waitingLines: ["Açıq mənbələr araşdırılır…", "Şirkət siqnalları yoxlanılır…", "Ən uyğun suallar hazırlanır…"],
+      reviewingCv: "Araşdırma tamamlandı — CV-niz nəzərdən keçirilir…",
+      elapsed: (time: string) => `${time} keçdi`,
+      slow: "Bu, adətən çəkdiyindən bir az uzun sürür, amma hələ də işləyirik.",
     },
     preparation: {
       eyebrow: "Müsahibə hazırlığınız",
@@ -472,8 +481,9 @@ export const uiCopy = {
       strongItems: ["Düşüncə xəttinizi izləmək üçün kifayət qədər kontekst verdiniz.", "Cavabınız əsas suala birbaşa toxundu."],
       improve: "Təkmilləşdirin",
       improveItems: ["Şəxsi töhfənizi daha aydın göstərin.", "Ölçülə bilən bir nəticə və ya qərar meyarı əlavə edin."],
-      likelyFollowUp: "Ehtimal olunan əlavə sual",
       continue: "Davam et",
+      timeRemaining: (time: string) => `${time} qalıb`,
+      timeUp: "Vaxt bitdi — hazır olduqda tamamlayın.",
     },
     report: {
       complete: "Müsahibə tamamlandı",

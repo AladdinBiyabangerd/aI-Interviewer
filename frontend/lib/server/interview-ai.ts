@@ -449,13 +449,14 @@ export function buildAnalysis(
   };
 }
 
-export async function evaluatePracticeAnswer(input: {
+async function requestPracticeFeedback(input: {
   details: InterviewDetails;
   question: string;
   answer: string;
   kind: "question" | "follow_up";
   language: string;
   safetyIdentifier: string;
+  insistOnFollowUp: boolean;
 }): Promise<PracticeFeedback> {
   const response = await openAI().responses.create({
     model: openAIModel(),
@@ -467,7 +468,7 @@ export async function evaluatePracticeAnswer(input: {
       "Evaluate only evidence present in the answer; do not invent achievements.",
       "Give 1 to 3 concise strengths and 1 to 3 specific improvements.",
       input.kind === "question"
-        ? "Create one adaptive follow-up that probes the weakest, vaguest, or most consequential part of this exact answer."
+        ? `${input.insistOnFollowUp ? "You must always" : "Always"} create exactly one adaptive follow-up question that probes the weakest, vaguest, or most consequential part of this exact answer. adaptiveFollowUp must never be an empty string.`
         : "The answer is to a follow-up. Return an empty adaptiveFollowUp string.",
       `Write feedback in ${input.language}.`,
     ].join(" "),
@@ -497,6 +498,25 @@ export async function evaluatePracticeAnswer(input: {
     improvements: parsed.improvements.map((item) => boundedText(item, 500)).filter((item): item is string => Boolean(item)).slice(0, 3),
     adaptiveFollowUp: boundedText(parsed.adaptiveFollowUp, 700) ?? "",
   };
+}
+
+export async function evaluatePracticeAnswer(input: {
+  details: InterviewDetails;
+  question: string;
+  answer: string;
+  kind: "question" | "follow_up";
+  language: string;
+  safetyIdentifier: string;
+}): Promise<PracticeFeedback> {
+  const feedback = await requestPracticeFeedback({ ...input, insistOnFollowUp: false });
+  if (input.kind !== "question" || feedback.adaptiveFollowUp) return feedback;
+  try {
+    return await requestPracticeFeedback({ ...input, insistOnFollowUp: true });
+  } catch {
+    // The first, schema-valid feedback still stands; an empty adaptiveFollowUp
+    // is treated by the caller as "no follow-up for this turn".
+    return feedback;
+  }
 }
 
 export async function createPracticeReport(input: {

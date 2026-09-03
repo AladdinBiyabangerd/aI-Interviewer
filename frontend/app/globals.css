@@ -338,6 +338,7 @@ h1, h2, h3, p { text-wrap: pretty; }
 .analysis-steps li.complete > span { border-color: var(--accent); background: var(--accent); color: white; }
 @keyframes pulse { from { box-shadow: 0 0 0 0 rgba(47, 95, 208, 0.22); } to { box-shadow: 0 0 0 5px rgba(47, 95, 208, 0); } }
 @media (prefers-reduced-motion: reduce) { .analysis-steps li.active > span { animation: none; } }
+.analysis-elapsed { margin: 18px 0 0; color: var(--secondary); font-size: 13px; }
 
 .prepared-page { max-width: var(--content-width); }
 .preparation-header { padding-bottom: 32px; border-bottom: 1px solid var(--border-strong); }
@@ -446,6 +447,7 @@ h1, h2, h3, p { text-wrap: pretty; }
 .active-context strong, .active-context span { display: block; }
 .active-context strong { font-size: 15px; font-weight: 620; }
 .active-context span, .active-context p:last-child { color: var(--secondary); font-size: 13px; }
+.time-remaining.expired { color: var(--danger); }
 .interview-progress { height: 2px; margin: 20px 0 58px; background: var(--border); }
 .interview-progress span { display: block; height: 100%; background: var(--accent); transition: width 160ms ease; }
 .interview-question { padding-bottom: 38px; border-bottom: 1px solid var(--border-strong); }
@@ -462,9 +464,6 @@ h1, h2, h3, p { text-wrap: pretty; }
 .feedback-columns strong { font-size: 13px; }
 .feedback-columns ul { margin: 8px 0 0; padding-left: 18px; color: var(--secondary); font-size: 14px; }
 .feedback-columns li + li { margin-top: 4px; }
-.likely-follow-up { margin: 0 0 20px; padding: 14px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.likely-follow-up span { color: var(--secondary); font-size: 13px; font-weight: 620; text-transform: uppercase; letter-spacing: 0.05em; }
-.likely-follow-up p { margin: 5px 0 0; font-size: 16px; }
 
 .report-intro { padding: 44px 0 32px; max-width: 780px; }
 .report-intro h2 { margin: 0; font-size: 34px; font-weight: 610; letter-spacing: -0.03em; }

@@ -73,6 +73,17 @@ export const analysisSteps = [
   "Preparing likely questions",
 ] as const;
 
+export type AnalysisPhase = "researching" | "reviewing_cv";
+
+export type AnalysisProgress = {
+  stepIndex: number;
+  phase: AnalysisPhase | null;
+  elapsedMs: number;
+  slow: boolean;
+};
+
+const SLOW_AFTER_MS = 45_000;
+
 type ApiErrorBody = { code?: string };
 
 async function apiError(response: Response): Promise<Error> {
@@ -114,7 +125,7 @@ const wait = (milliseconds: number) => new Promise<void>((resolve) => window.set
 
 export async function prepareInterview(
   details: InterviewDetails,
-  onStep: (stepIndex: number) => void,
+  onProgress: (progress: AnalysisProgress) => void,
 ): Promise<InterviewAnalysis> {
   const response = await fetch("/api/interview-preparations/analyze", {
     method: "POST",
@@ -124,17 +135,23 @@ export async function prepareInterview(
   if (!response.ok) throw await apiError(response);
   const started = await response.json() as { jobId: string };
   const startedAt = Date.now();
+  // The last step is reserved for genuine completion; while polling, progress
+  // parks on the second-to-last step instead of sitting at a false "done".
+  const parkedStep = analysisSteps.length - 2;
+  let phase: AnalysisPhase | null = null;
   for (let attempt = 0; attempt < 300; attempt += 1) {
-    onStep(Math.min(analysisSteps.length - 1, Math.floor((Date.now() - startedAt) / 4_000)));
+    const elapsedMs = Date.now() - startedAt;
+    onProgress({ stepIndex: Math.min(parkedStep, Math.floor(elapsedMs / 4_000)), phase, elapsedMs, slow: elapsedMs > SLOW_AFTER_MS });
     await wait(attempt === 0 ? 500 : 2_000);
     const status = await fetch(`/api/interview-preparations/analyze/${encodeURIComponent(started.jobId)}`, { cache: "no-store" });
     if (!status.ok) throw await apiError(status);
-    const body = await status.json() as { status: string; analysis?: InterviewAnalysis };
+    const body = await status.json() as { status: string; analysis?: InterviewAnalysis; phase?: AnalysisPhase };
     if (body.status === "completed" && body.analysis) {
-      onStep(analysisSteps.length - 1);
+      onProgress({ stepIndex: analysisSteps.length - 1, phase, elapsedMs: Date.now() - startedAt, slow: false });
       return body.analysis;
     }
     if (body.status === "failed") throw new Error("analysis_failed");
+    phase = body.phase ?? phase;
   }
   throw new Error("analysis_timeout");
 }

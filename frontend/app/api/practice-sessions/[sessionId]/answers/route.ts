@@ -68,7 +68,7 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
     console.error("Practice answer evaluation failed", error instanceof Error ? error.message : "unknown_error");
     return json({ code: "feedback_unavailable" }, 502, session);
   }
-  if (kind === "question" && !feedback.adaptiveFollowUp) feedback.adaptiveFollowUp = question.followUp;
+  const hasFollowUp = kind === "question" && Boolean(feedback.adaptiveFollowUp);
 
   try {
     const result = await sql.begin(async (transaction) => {
@@ -93,7 +93,7 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
           ${transaction.json(feedback)}
         )
       `;
-      if (kind === "question") {
+      if (hasFollowUp) {
         await transaction`
           UPDATE interview_practice_sessions
           SET awaiting_follow_up = true, pending_follow_up = ${feedback.adaptiveFollowUp}, updated_at = now()

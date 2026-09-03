@@ -55,6 +55,7 @@ export async function preparationByProviderResponse(id: string): Promise<Prepara
 export async function refreshPreparation(row: PreparationJobRow): Promise<{
   status: "queued" | "in_progress" | "completed" | "failed";
   analysis?: InterviewAnalysis;
+  phase?: "researching" | "reviewing_cv";
 }> {
   if (row.status === "completed" && row.analysis) return { status: "completed", analysis: row.analysis };
   if (row.status === "failed") return { status: "failed" };
@@ -77,7 +78,10 @@ export async function refreshPreparation(row: PreparationJobRow): Promise<{
     `;
     return { status: "failed" };
   }
-  if (responses.some((response) => response.status !== "completed")) return { status: "in_progress" };
+  if (responses.some((response) => response.status !== "completed")) {
+    const cvPending = cv !== null && cv.status !== "completed";
+    return { status: "in_progress", phase: research.status === "completed" && cvPending ? "reviewing_cv" : "researching" };
+  }
 
   const analysis = buildAnalysis(
     row.id,
