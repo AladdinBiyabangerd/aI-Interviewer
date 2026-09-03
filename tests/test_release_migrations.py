@@ -91,6 +91,21 @@ def test_hosted_migrations_require_file_secret_tls_and_release_identity(
     assert environment_secret.database_url_file is None
 
 
+def test_a_blank_direct_database_url_does_not_conflict_with_database_url_file(
+    tmp_path: Path,
+) -> None:
+    """A present-but-blank env var (a common orchestrator/template default)
+
+    must be treated the same as an absent one, not as a real value that
+    conflicts with database_url_file.
+    """
+    secret_file = _write_database_secret(tmp_path / "database-url")
+    settings = MigrationSettings(_env_file=None, database_url="   ", database_url_file=secret_file)
+    assert settings.database_url.get_secret_value() == (
+        "postgresql+psycopg://migration:strong@db.example.com/application"
+    )
+
+
 def test_release_artifact_contains_exactly_the_expected_head() -> None:
     assert verify_migration_artifact() == EXPECTED_SCHEMA_REVISION
 

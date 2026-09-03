@@ -164,7 +164,17 @@ class Settings(BaseSettings):
             file_value = values.get(file_field)
             if file_value is None:
                 continue
-            if value_field in values and values[value_field] is not None:
+            direct_value = values.get(value_field)
+            if isinstance(direct_value, str) and not direct_value.strip():
+                # An env var present but blank (a common orchestrator/template
+                # default) must count as unset, matching how the dedicated
+                # field validators treat blank secrets — otherwise a hosted
+                # deployment using *_file secrets fails startup with a false
+                # "mutually exclusive" error whenever the direct var is also
+                # declared, even empty.
+                direct_value = None
+                values[value_field] = None
+            if direct_value is not None:
                 raise ValueError(f"{value_field} and {file_field} are mutually exclusive")
             try:
                 values[value_field] = read_secret_file(file_value, hosted=hosted)
@@ -212,6 +222,22 @@ class Settings(BaseSettings):
                 "telemetry endpoint must be an absolute credential-free HTTP(S) origin"
             )
         return normalized
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_driver(cls, value: object) -> object:
+        # A connection string copied from a typical hosting provider uses
+        # the standard postgres(ql):// scheme. ai-interviewer-migrate
+        # already accepts and normalizes that form for the same env var; the
+        # API must accept it too instead of failing to start on an input the
+        # migration tool considers valid.
+        raw = value.get_secret_value() if isinstance(value, SecretStr) else value
+        if isinstance(raw, str):
+            if raw.startswith("postgres://"):
+                return "postgresql+psycopg://" + raw.removeprefix("postgres://")
+            if raw.startswith("postgresql://"):
+                return "postgresql+psycopg://" + raw.removeprefix("postgresql://")
+        return value
 
     @field_validator("database_url")
     @classmethod
@@ -421,6 +447,11 @@ class Settings(BaseSettings):
             if self.database_tls_mode == "disable":
                 raise ValueError("database TLS is required in hosted environments")
             if self.database_url_file is None:
+                # Unlike MigrationSettings (a one-shot CLI process),
+                # there is deliberately no env-injected-secret escape
+                # hatch here: this is the always-running API, so a
+                # mounted secret file is required in hosted environments
+                # without exception — see ADR-0007.
                 raise ValueError("hosted database credentials require database_url_file")
             database_url = make_url(self.database_url.get_secret_value())
             if database_url.password == "local-only":

@@ -56,6 +56,12 @@ class MigrationSettings(BaseSettings):
         "postgresql+psycopg://ai_interviewer:local-only@127.0.0.1:55432/ai_interviewer"
     )
     database_url_file: Path | None = None
+    # Narrower than Settings.validate_hosted_safety on purpose: this is a
+    # one-shot CLI process (e.g. a platform build/deploy step), not the
+    # always-running API, so a short-lived env-injected secret is an
+    # acceptable, explicit opt-in here. The always-running API has no such
+    # escape hatch and must always use a mounted secret file in hosted
+    # environments — see ADR-0007.
     hosted_environment_secrets: bool = False
     database_tls_mode: DatabaseTLSMode = "disable"
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
@@ -72,7 +78,14 @@ class MigrationSettings(BaseSettings):
         file_value = values.get("database_url_file")
         if file_value is None:
             return values
-        if values.get("database_url") is not None:
+        direct_value = values.get("database_url")
+        if isinstance(direct_value, str) and not direct_value.strip():
+            # An env var present but blank (a common orchestrator/template
+            # default) must count as unset, not as a real value that
+            # conflicts with database_url_file.
+            direct_value = None
+            values["database_url"] = None
+        if direct_value is not None:
             raise ValueError("database_url and database_url_file are mutually exclusive")
         hosted = str(values.get("environment", "development")).lower() in {
             "staging",

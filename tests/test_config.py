@@ -410,6 +410,19 @@ def test_database_url_requires_psycopg_and_database_name(database_url: str) -> N
         Settings(_env_file=None, database_url=database_url)
 
 
+@pytest.mark.parametrize("scheme", ["postgres://", "postgresql://"])
+def test_database_url_accepts_the_standard_scheme_like_the_migration_tool_does(
+    scheme: str,
+) -> None:
+    """ai-interviewer-migrate normalizes postgres(ql):// to +psycopg; the API
+
+    settings must accept the same connection string shape for the same env
+    var, not fail to start on an input the migration tool considers valid.
+    """
+    settings = Settings(_env_file=None, database_url=f"{scheme}app:password@localhost/app")
+    assert settings.database_url.get_secret_value() == "postgresql+psycopg://app:password@localhost/app"
+
+
 def test_secret_file_coordinates_are_exclusive_and_validated(tmp_path: Path) -> None:
     missing = tmp_path / "missing-secret"
     with pytest.raises(ValidationError, match="secret file is unavailable"):
@@ -425,6 +438,24 @@ def test_secret_file_coordinates_are_exclusive_and_validated(tmp_path: Path) -> 
             database_url="postgresql+psycopg://app:other@db.example.com/app",
             database_url_file=database_file,
         )
+
+
+def test_a_blank_direct_secret_does_not_conflict_with_its_file_counterpart(
+    tmp_path: Path,
+) -> None:
+    """A present-but-blank env var (a common orchestrator/template default)
+
+    must be treated the same as an absent one, not as a real value that
+    conflicts with the *_file alternative.
+    """
+    database_file = _write_secret(
+        tmp_path / "database-url",
+        "postgresql+psycopg://app:strong@db.example.com/app",
+    )
+    settings = Settings(_env_file=None, database_url="   ", database_url_file=database_file)
+    assert settings.database_url.get_secret_value() == (
+        "postgresql+psycopg://app:strong@db.example.com/app"
+    )
 
 
 @pytest.mark.parametrize(
