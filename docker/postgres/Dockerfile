@@ -8,6 +8,7 @@ USER root
 RUN apk add --no-cache --upgrade \
         "libcrypto3=3.5.8-r0" \
         "libssl3=3.5.8-r0" \
+        "libuuid=2.42.3-r1" \
     && rm -f /usr/local/bin/gosu
 
 USER postgres

@@ -42,6 +42,7 @@ WORKDIR /app
 RUN apk add --no-cache --upgrade \
         "libcrypto3=3.5.8-r0" \
         "libssl3=3.5.8-r0" \
+        "libuuid=2.42.3-r1" \
     && addgroup --system --gid 10001 app \
     && adduser --system --disabled-password --no-create-home --uid 10001 --ingroup app app
 
