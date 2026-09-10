@@ -1,3 +1,4 @@
+import { publicInterviewGuard } from "../../../../../lib/server/interview-access";
 import type { InterviewDetails, PracticeFeedback, PracticeReport } from "../../../../../lib/interview-api";
 import { database } from "../../../../../lib/server/database";
 import { json } from "../../../../../lib/server/http";
@@ -17,6 +18,8 @@ type SessionRow = {
 type TurnRow = { prompt: string; answer: string; feedback: PracticeFeedback };
 
 export async function POST(request: Request, context: { params: Promise<{ sessionId: string }> }) {
+  const blocked = publicInterviewGuard();
+  if (blocked) return blocked;
   const session = sessionFor(request);
   const { sessionId } = await context.params;
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return json({ code: "not_found" }, 404, session);

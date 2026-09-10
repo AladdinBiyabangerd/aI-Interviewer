@@ -4,9 +4,9 @@ import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
-const title = "Interview Prep — Prepare for the questions that matter";
+const title = "Interview Prep — Check your Java knowledge";
 const description =
-  "Prepare likely questions for a specific company, role and vacancy, then practise them in a focused interview.";
+  "Assess your Java knowledge with adaptive choice-based questions, instant scores and a focused study plan for Junior, Mid and Senior engineers.";
 
 const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
 const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
@@ -20,8 +20,8 @@ export const metadata: Metadata = {
   metadataBase,
   title,
   description,
-  openGraph: { title, description, images: [{ url: "/og.png", width: 1732, height: 909 }] },
-  twitter: { card: "summary_large_image", title, description, images: ["/og.png"] },
+  openGraph: { title, description },
+  twitter: { card: "summary", title, description },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

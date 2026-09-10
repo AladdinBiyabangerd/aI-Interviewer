@@ -1,5 +1,12 @@
 # AI Interviewer Platform
 
+The public frontend now implements a **general Java Q&A assessment MVP**: reusable
+versioned questions, single/multiple choice, adaptive difficulty, server-side scores,
+study references and student ratings/flags. Company context is optional. Open-ended
+interviews are no longer public. See the [assessment setup and review guide](docs/java-assessment-mvp.md)
+and [ADR 0030](docs/adr/0030-general-java-question-assessment.md). The historical Python
+platform scope below remains separate from this public-product change.
+
 Production-oriented implementation of the candidate-preparation platform described in the supplied technical plan. Development is intentionally incremental: a phase must satisfy its exit gate before work starts on dependent product capabilities.
 
 ## Current scope
@@ -29,15 +36,17 @@ For a single detailed account of everything implemented from the beginning, see 
 - Docker, for PostgreSQL integration and container verification
 - Node.js 22.13 or newer, for the interactive frontend demo
 
-## Production text application
+## Public Java assessment application
 
-A bilingual English/Azerbaijani responsive production application is available in
-[`frontend`](frontend/README.md). It implements the complete text flow: persistent private
-CV upload, asynchronous company/CV analysis, evidence-labeled likely questions, saved
-practice sessions, answer-dependent follow-ups, and an AI-generated final report. The
-standard Next.js application is deployable on Vercel; PostgreSQL, private Vercel Blob,
-and OpenAI remain server-side dependencies. See the complete
-[Vercel deployment runbook](docs/deployment/vercel.md).
+The responsive [`frontend`](frontend/README.md) provides an English Java assessment
+with Junior, Mid and Senior scope. PostgreSQL stores the question bank, saved answers
+and feedback. Assessment requests need no OpenAI or Blob service. Apply migration
+`20260910_0016`, load and review the seed question bank using the
+[assessment guide](docs/java-assessment-mvp.md), then start the Next.js application.
+Uploaded question PDFs use the deterministic, private
+[source-ingestion workflow](docs/java-question-source-ingestion.md); staged source text
+never becomes a public question without separate rights and editorial review.
+The former bilingual interview implementation is retained outside public routes.
 
 ```powershell
 cd frontend

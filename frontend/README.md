@@ -1,5 +1,21 @@
 # Interview Prep web application
 
+**Current public MVP:** general Java Q&A assessment in English, with a reusable
+45-question seed, level/topic selection, adaptive difficulty, deterministic scores,
+learning references, ratings and editorial flags. See the
+[setup and editorial guide](../docs/java-assessment-mvp.md). It requires PostgreSQL at
+`20260910_0016`, a signed session secret and the retention cron secret. Seed imports
+enter draft; publish the exact revisions after review. OpenAI and Blob are not needed
+for assessments. The former interview page is retained in `legacy/page.tsx` and its
+public endpoints return 410.
+
+Operator-supplied question PDFs use the private
+[source-ingestion workflow](../docs/java-question-source-ingestion.md). Deterministic
+extraction preserves page provenance and answer pairing; it does not use a model or
+publish staged source wording.
+
+## Historical interview implementation (not public in the MVP)
+
 This directory contains the standard Next.js 16 application deployed by Vercel. It
 supports English and Azerbaijani and implements the complete production text journey:
 

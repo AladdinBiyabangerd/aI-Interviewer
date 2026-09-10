@@ -1,3 +1,4 @@
+import { publicInterviewGuard } from "../../../../lib/server/interview-access";
 import { head } from "@vercel/blob";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 
@@ -29,6 +30,8 @@ function inferredType(pathname: string): string {
 }
 
 export async function POST(request: Request) {
+  const blocked = publicInterviewGuard();
+  if (blocked) return blocked;
   const session = sessionFor(request);
   let body: HandleUploadBody;
   try {

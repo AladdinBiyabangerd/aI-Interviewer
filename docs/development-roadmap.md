@@ -1,5 +1,10 @@
 # AI Interviewer Platform - Development Roadmap
 
+> **Current public MVP:** [ADR 0030](adr/0030-general-java-question-assessment.md)
+> supersedes the public interview flow described below. The live student entry point is
+> a general Java single/multiple-choice assessment with immediate deterministic scoring.
+> The interview architecture in this document is retained as a future product track.
+
 ## 1. Product interpretation and immutable guardrails
 
 The source plan describes a candidate-preparation product, not an employer decision system and not a generic question chatbot. The durable product is an evidence-grounded interview intelligence and decision engine that combines company context, role and seniority, interview round, job description, CV claims, and later candidate skill state.

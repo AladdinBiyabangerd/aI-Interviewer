@@ -27,9 +27,11 @@ export async function GET(request: Request) {
   if (uploads.length) await del(uploads.map((row) => row.blob_url));
   const deleted = await sql.begin(async (transaction) => {
     const sessions = await transaction`DELETE FROM interview_practice_sessions WHERE expires_at <= now() RETURNING id`;
+    const assessments = await transaction`DELETE FROM java_assessment_sessions WHERE expires_at <= now() RETURNING id`;
+    const feedback = await transaction`DELETE FROM java_question_feedback WHERE expires_at <= now() RETURNING question_id`;
     const jobs = await transaction`DELETE FROM interview_preparations WHERE expires_at <= now() RETURNING id`;
     const files = await transaction`DELETE FROM interview_cv_uploads WHERE expires_at <= now() RETURNING id`;
-    return { sessions: sessions.length, preparations: jobs.length, uploads: files.length };
+    return { sessions: sessions.length, assessments: assessments.length, feedback: feedback.length, preparations: jobs.length, uploads: files.length };
   });
   return json({ deleted });
 }

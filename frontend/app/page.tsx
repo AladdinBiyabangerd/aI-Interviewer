@@ -1,840 +1,131 @@
 "use client";
 
-import { ChangeEvent, createContext, FormEvent, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { availableTopics, defaultTopics, levels, roadmapUrl, topics, type AnswerFeedback, type AssessmentView, type Level, type Reference } from "../lib/assessment";
+import "./assessment.css";
 
-import {
-  AnalysisProgress,
-  InterviewAnalysis,
-  InterviewDetails,
-  InterviewLanguage,
-  InterviewStage,
-  PracticeDuration,
-  PracticeFeedback,
-  PracticeFocus,
-  PracticeMode,
-  PracticeReport,
-  PreparationQuestion,
-  finishPracticeSession,
-  loadRecentPreparation,
-  prepareInterview,
-  QuestionCategory,
-  Seniority,
-  startPractice,
-  submitPracticeAnswer,
-  uploadCv,
-} from "../lib/interview-api";
-import { UiCopy, UiLanguage, uiCopy } from "../lib/ui-copy";
-
-type View =
-  | "home"
-  | "form"
-  | "analyzing"
-  | "overview"
-  | "questions"
-  | "practice-setup"
-  | "practice-active"
-  | "report-loading"
-  | "report";
-
-type InterfaceLanguageContextValue = {
-  language: UiLanguage;
-  setLanguage: (language: UiLanguage) => void;
-  t: UiCopy;
+const errors: Record<string, string> = {
+  topic_unavailable: "One of these topics has no published questions yet. Choose another topic or try again after the question bank is reviewed.",
+  assessment_unavailable: "Assessments are temporarily unavailable. Please try again.",
+  rate_limited: "You have started several assessments recently. Please wait a few minutes before starting another.",
+  session_not_found: "This assessment has expired or belongs to another browser. Start a new assessment.",
+  stale_question: "This question has already advanced in another tab. Reload the saved assessment to continue.",
+  answer_already_saved: "An answer for this question is already saved. Reload the assessment to see it.",
 };
-
-const InterfaceLanguageContext = createContext<InterfaceLanguageContextValue | null>(null);
-
-function useInterfaceLanguage() {
-  const value = useContext(InterfaceLanguageContext);
-  if (!value) throw new Error("Interface language context is unavailable");
-  return value;
+async function api(path: string, input?: object): Promise<AssessmentView | null> {
+  const response = await fetch(path, { method: input ? "POST" : "GET", cache: "no-store",
+    ...(input ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) } : {}) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(errors[result.code] ?? "Your change could not be saved. Please try again.");
+  return result.assessment;
 }
-
-function localizeFocusArea(label: string, t: UiCopy) {
-  const labels: Record<string, string> = {
-    "RAG / LLM systems": t.focusAreaLabels.rag,
-    "Python and API engineering": t.focusAreaLabels.python,
-    "Production deployment": t.focusAreaLabels.deployment,
-    "Technical decision-making": t.focusAreaLabels.decisions,
-    "Clear evidence and outcomes": t.focusAreaLabels.evidence,
-    "Project ownership": t.focusAreaLabels.ownership,
-    "Technical decisions": t.focusAreaLabels.technicalDecisions,
-    "Measured outcomes": t.focusAreaLabels.outcomes,
-  };
-  return labels[label] ?? label;
+function References({ items }: { items: Reference[] }) {
+  return <ul className="qa-references">{items.map((r) => <li key={r.url}><a href={r.url} target="_blank" rel="noreferrer">{r.title} <span aria-hidden="true">↗</span></a></li>)}</ul>;
 }
-
-const initialDetails: InterviewDetails = {
-  company: "",
-  role: "",
-  jobDescription: "",
-  jobUrl: "",
-  seniority: "Not specified",
-  stage: "Not sure",
-  language: "English",
-  cvUploadId: null,
-  cvFileName: null,
-  cvFileType: null,
-  cvFileSize: null,
-};
-
-const seniorities: Seniority[] = ["Not specified", "Intern", "Junior", "Mid-level", "Senior", "Lead"];
-const stages: InterviewStage[] = [
-  "Not sure",
-  "HR / Recruiter",
-  "Technical Interview",
-  "Coding Interview",
-  "System Design",
-  "Hiring Manager",
-  "Final Interview",
-];
-
-function Brand({ onClick }: { onClick: () => void }) {
-  const { t } = useInterfaceLanguage();
-  return (
-    <button className="brand" type="button" onClick={onClick} aria-label={t.brandAria}>
-      <span aria-hidden="true">IP</span>
-      <b>Interview Prep</b>
-    </button>
-  );
-}
-
-function Header({
-  analysis,
-  activeView,
-  onNavigate,
-}: {
-  analysis: InterviewAnalysis | null;
-  activeView: View;
-  onNavigate: (view: View) => void;
-}) {
-  const { language, setLanguage, t } = useInterfaceLanguage();
-  const preparedView = ["overview", "questions", "practice-setup", "practice-active", "report-loading", "report"].includes(activeView);
-  return (
-    <header className="site-header">
-      <div className="header-inner">
-        <Brand onClick={() => onNavigate("home")} />
-        {analysis && preparedView ? (
-          <nav className="preparation-nav" aria-label={t.nav.label}>
-            <button className={activeView === "overview" ? "active" : ""} onClick={() => onNavigate("overview")} type="button">{t.nav.overview}</button>
-            <button className={activeView === "questions" ? "active" : ""} onClick={() => onNavigate("questions")} type="button">{t.nav.questions}</button>
-            <button className={activeView.startsWith("practice") ? "active" : ""} onClick={() => onNavigate("practice-setup")} type="button">{t.nav.practice}</button>
-          </nav>
-        ) : null}
-        <div className="language-switch" role="group" aria-label={t.switchLanguage}>
-          <button aria-pressed={language === "az"} className={language === "az" ? "active" : ""} onClick={() => setLanguage("az")} type="button">AZ</button>
-          <span aria-hidden="true">/</span>
-          <button aria-pressed={language === "en"} className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")} type="button">EN</button>
-        </div>
-        <button className="header-action" data-short-label={language === "az" ? "Yeni" : "New"} type="button" onClick={() => onNavigate("form")}><span>{t.nav.newPreparation}</span></button>
-      </div>
-    </header>
-  );
-}
-
-function Home({ recent, onStart, onOpen }: { recent: InterviewAnalysis | null; onStart: () => void; onOpen: () => void }) {
-  const { t } = useInterfaceLanguage();
-  return (
-    <>
-      <main className="page home-page">
-        <section className="home-hero" aria-labelledby="home-title">
-          <div className="home-intro">
-            <p className="eyebrow">{t.home.eyebrow}</p>
-            <h1 id="home-title">{t.home.title}</h1>
-            <p className="home-copy">{t.home.intro}</p>
-            <button className="button button-primary" onClick={onStart} type="button">
-              {t.home.cta} <span aria-hidden="true">→</span>
-            </button>
-            <p className="home-note">{t.home.noAccount}</p>
-          </div>
-
-          <aside className="product-preview" aria-label={t.home.previewAria}>
-            <div className="preview-header">
-              <div>
-                <p>{t.home.previewLabel}</p>
-                <h2>{t.home.previewCompany}</h2>
-                <span>{t.home.previewRole}</span>
-              </div>
-              <strong>{t.home.previewStage}</strong>
-            </div>
-
-            <section className="preview-section" aria-labelledby="preview-sources-title">
-              <h3 id="preview-sources-title">{t.home.sources}</h3>
-              <dl className="preview-rows">
-                <div><dt>{t.home.jobRequirements}</dt><dd>{t.home.included}</dd></div>
-                <div><dt>CV</dt><dd>{t.home.included}</dd></div>
-                <div><dt>{t.home.companySignals}</dt><dd>{t.home.available}</dd></div>
-              </dl>
-            </section>
-
-            <section className="preview-section" aria-labelledby="preview-focus-title">
-              <h3 id="preview-focus-title">{t.home.focusAreas}</h3>
-              <dl className="preview-rows">
-                <div><dt>{t.home.rag}</dt><dd>{t.home.high}</dd></div>
-                <div><dt>{t.home.python}</dt><dd>{t.home.high}</dd></div>
-                <div><dt>{t.home.ml}</dt><dd>{t.home.high}</dd></div>
-                <div><dt>{t.home.deployment}</dt><dd>{t.home.medium}</dd></div>
-              </dl>
-            </section>
-
-            <section className="preview-question" aria-labelledby="preview-question-title">
-              <div><strong>{t.home.questionCount}</strong><span>{t.home.exampleQuestionLabel}</span></div>
-              <p id="preview-question-title">{t.home.exampleQuestion}</p>
-              <span className="source-tag">{t.home.jobDescription}</span>
-            </section>
-          </aside>
-        </section>
-
-        <section className="home-benefits" aria-labelledby="benefits-title">
-          <div className="home-section-heading">
-            <div><p className="eyebrow">{t.home.onePreparation}</p><h2 id="benefits-title">{t.home.benefitsTitle}</h2></div>
-            <p>{t.home.benefitsIntro}</p>
-          </div>
-          <div className="benefit-grid">
-            {t.home.benefits.map(([title, description], index) => (
-              <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{description}</p></article>
-            ))}
-          </div>
-        </section>
-
-        <section className="personalization-section" aria-labelledby="personalization-title">
-          <div className="home-section-heading">
-            <div><p className="eyebrow">{t.home.personalised}</p><h2 id="personalization-title">{t.home.personalisedTitle}</h2></div>
-            <p>{t.home.personalisedIntro}</p>
-          </div>
-          <div className="personalization-example">
-            <div className="signal-column">
-              <div className="signal-group">
-                <h3>{t.home.vacancyTitle}</h3>
-                <ul>{t.home.vacancySignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
-              </div>
-              <div className="signal-group">
-                <h3>{t.home.cvSignalsTitle}</h3>
-                <ul>{t.home.cvSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
-              </div>
-            </div>
-            <div className="example-flow" aria-hidden="true"><span>→</span></div>
-            <div className="resulting-questions">
-              <h3>{t.home.likelyQuestions}</h3>
-              <ol>{t.home.sampleQuestions.map((question) => <li key={question}>{question}</li>)}</ol>
-            </div>
-          </div>
-        </section>
-
-        {recent ? (
-          <section className="recent-section" aria-labelledby="recent-title">
-            <div className="section-heading compact-heading">
-              <div><p className="eyebrow">{t.home.recent}</p><h2 id="recent-title">{t.home.continuePreparing}</h2></div>
-            </div>
-            <button className="recent-row" type="button" onClick={onOpen}>
-              <span><strong>{recent.details.company}</strong><small>{recent.details.role}</small></span>
-              <span><small>{t.stageLabels[recent.details.stage]}</small><strong aria-hidden="true">→</strong></span>
-            </button>
-          </section>
-        ) : null}
-
-        <section className="home-final-cta" aria-labelledby="home-cta-title">
-          <div><p className="eyebrow">{t.home.ready}</p><h2 id="home-cta-title">{t.home.finalTitle}</h2><p>{t.home.finalIntro}</p></div>
-          <button className="button button-primary" onClick={onStart} type="button">{t.home.start} <span aria-hidden="true">→</span></button>
-        </section>
-      </main>
-
-      <footer className="home-footer">
-        <div><strong>Interview Prep</strong><span>{t.home.footer}</span></div>
-      </footer>
-    </>
-  );
-}
-
-function InterviewForm({
-  value,
-  error,
-  onChange,
-  onSubmit,
-}: {
-  value: InterviewDetails;
-  error: string | null;
-  onChange: (value: InterviewDetails) => void;
-  onSubmit: () => void;
-}) {
-  const { t } = useInterfaceLanguage();
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const ready = !uploading && value.company.trim().length > 1 && value.role.trim().length > 1 && value.jobDescription.trim().length >= 40;
-
-  function update<K extends keyof InterviewDetails>(key: K, nextValue: InterviewDetails[K]) {
-    onChange({ ...value, [key]: nextValue });
-  }
-
-  async function selectFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const extension = file.name.split(".").pop()?.toLocaleLowerCase("en-US");
-    if (!extension || !["pdf", "docx"].includes(extension)) {
-      setFileError(t.form.invalidFile);
-      event.target.value = "";
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setFileError(t.form.fileTooLarge);
-      event.target.value = "";
-      return;
-    }
-    setFileError(null);
-    setUploading(true);
-    setUploadProgress(0);
-    try {
-      const uploaded = await uploadCv(file, setUploadProgress);
-      onChange({ ...value, ...uploaded });
-    } catch {
-      setFileError(t.form.fileReadError);
-      event.target.value = "";
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (ready) onSubmit();
-  }
-
-  return (
-    <main className="page form-page">
-      <div className="page-heading">
-        <p className="eyebrow">{t.form.eyebrow}</p>
-        <h1>{t.form.title}</h1>
-        <p>{t.form.intro}</p>
-      </div>
-
-      <form className="interview-form" onSubmit={submit}>
-        <section className="form-section" aria-labelledby="role-details-heading">
-          <div className="form-section-heading"><span>01</span><div><h2 id="role-details-heading">{t.form.roleTitle}</h2><p>{t.form.roleIntro}</p></div></div>
-          <div className="two-column-fields">
-            <label>{t.form.company}<input required autoComplete="organization" placeholder="PASHA Bank" value={value.company} onChange={(event) => update("company", event.target.value)} /></label>
-            <label>{t.form.role}<input required placeholder="AI Engineer" value={value.role} onChange={(event) => update("role", event.target.value)} /></label>
-          </div>
-          <label className="full-field">{t.form.jobLink} <span>{t.form.optional}</span><input type="url" inputMode="url" placeholder="https://..." value={value.jobUrl} onChange={(event) => update("jobUrl", event.target.value)} /></label>
-        </section>
-
-        <section className="form-section" aria-labelledby="requirements-heading">
-          <div className="form-section-heading"><span>02</span><div><h2 id="requirements-heading">{t.form.requirementsTitle}</h2><p>{t.form.requirementsIntro}</p></div></div>
-          <label className="full-field important-field">
-            {t.form.jobDescription}
-            <textarea required minLength={40} rows={9} placeholder={t.form.jobPlaceholder} value={value.jobDescription} onChange={(event) => update("jobDescription", event.target.value)} />
-            <small>{t.form.characters(value.jobDescription.length)}</small>
-          </label>
-        </section>
-
-        <section className="form-section" aria-labelledby="interview-details-heading">
-          <div className="form-section-heading"><span>03</span><div><h2 id="interview-details-heading">{t.form.interviewTitle}</h2><p>{t.form.interviewIntro}</p></div></div>
-          <div className="three-column-fields">
-            <label>{t.form.seniority} <span>{t.form.optional}</span><select value={value.seniority} onChange={(event) => update("seniority", event.target.value as Seniority)}>{seniorities.map((item) => <option key={item} value={item}>{t.seniorityLabels[item]}</option>)}</select></label>
-            <label>{t.form.stage}<select value={value.stage} onChange={(event) => update("stage", event.target.value as InterviewStage)}>{stages.map((item) => <option key={item} value={item}>{t.stageLabels[item]}</option>)}</select></label>
-            <label>{t.form.language}<select value={value.language} onChange={(event) => update("language", event.target.value as InterviewLanguage)}>{(["Azerbaijani", "English"] as InterviewLanguage[]).map((item) => <option key={item} value={item}>{t.interviewLanguageLabels[item]}</option>)}</select></label>
-          </div>
-        </section>
-
-        <section className="form-section" aria-labelledby="cv-heading">
-          <div className="form-section-heading"><span>04</span><div><h2 id="cv-heading">{t.form.cvTitle} <em>{t.form.optional}</em></h2><p>{t.form.cvIntro}</p></div></div>
-          {value.cvFileName ? (
-            <div className="uploaded-file">
-              <span className="file-type" aria-hidden="true">CV</span>
-              <p><strong>{value.cvFileName}</strong><small>{t.form.readyToReview}</small></p>
-              <button type="button" onClick={() => { onChange({ ...value, cvUploadId: null, cvFileName: null, cvFileType: null, cvFileSize: null }); if (fileInput.current) fileInput.current.value = ""; }}>{t.form.remove}</button>
-            </div>
-          ) : (
-            <label className="upload-field">
-              <input ref={fileInput} type="file" disabled={uploading} accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={selectFile} />
-              <strong>{uploading ? `${Math.round(uploadProgress)}%` : t.form.uploadStart} {!uploading ? <span>{t.form.chooseFile}</span> : null}</strong>
-              <small>{uploading ? "Uploading securely…" : t.form.uploadMeta}</small>
-            </label>
-          )}
-          <p className="field-explanation">{t.form.cvExplanation}</p>
-          {fileError ? <p className="form-error" role="alert">{fileError}</p> : null}
-        </section>
-
-        <div className="form-footer">
-          <p>{t.form.privacy}</p>
-          <button className="button button-primary" disabled={!ready} type="submit">{t.form.prepare} <span aria-hidden="true">→</span></button>
-        </div>
-        {error ? <p className="form-error submit-error" role="alert">{error}</p> : null}
-      </form>
-    </main>
-  );
-}
-
-function elapsedClock(elapsedMs: number): string {
-  const totalSeconds = Math.floor(elapsedMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function Analyzing({ details, progress }: { details: InterviewDetails; progress: AnalysisProgress }) {
-  const { t } = useInterfaceLanguage();
-  const lastStep = t.analysis.steps.length - 1;
-  const waitingOnLastVisibleStep = progress.stepIndex === lastStep - 1;
-  const waitingLine = progress.phase === "reviewing_cv"
-    ? t.analysis.reviewingCv
-    : t.analysis.waitingLines[Math.floor(progress.elapsedMs / 6_000) % t.analysis.waitingLines.length];
-  return (
-    <main className="page analysis-page" aria-live="polite" aria-busy="true">
-      <section className="analysis-panel">
-        <p className="eyebrow">{t.analysis.eyebrow}</p>
-        <h1>{t.analysis.title(details.role)}</h1>
-        <p className="analysis-context">{details.company} · {t.stageLabels[details.stage]}</p>
-        <ol className="analysis-steps">
-          {t.analysis.steps.map((step, index) => (
-            <li className={index < progress.stepIndex ? "complete" : index === progress.stepIndex ? "active" : ""} key={step}>
-              <span aria-hidden="true">{index < progress.stepIndex ? "✓" : index + 1}</span>
-              <p>
-                <strong>{step}</strong>
-                {index === 2 && !details.cvFileName ? <small>{t.analysis.noCv}</small> : null}
-                {index === progress.stepIndex && waitingOnLastVisibleStep ? <small>{waitingLine}</small> : null}
-              </p>
-            </li>
-          ))}
-        </ol>
-        <p className="analysis-elapsed">
-          {t.analysis.elapsed(elapsedClock(progress.elapsedMs))}
-          {progress.slow ? <span> · {t.analysis.slow}</span> : null}
-        </p>
-      </section>
-    </main>
-  );
-}
-
-function PreparationHeader({ analysis }: { analysis: InterviewAnalysis }) {
-  const { t } = useInterfaceLanguage();
-  return (
-    <div className="preparation-header">
-      <p className="eyebrow">{t.preparation.eyebrow}</p>
-      <div><h1>{analysis.details.company}</h1><p>{analysis.details.role}<span aria-hidden="true">·</span>{t.stageLabels[analysis.details.stage]}</p></div>
+function Feedback({ feedback, busy, onRate }: { feedback: AnswerFeedback; busy: boolean; onRate: (input: object) => void }) {
+  const q = feedback.question;
+  return <section className="qa-feedback" aria-labelledby={`feedback-${q.id}`}>
+    <div className="qa-feedback-heading"><div><p className="eyebrow">Answer feedback</p><h2 id={`feedback-${q.id}`}>{feedback.score === 10 ? "You’ve got it." : feedback.score >= 7 ? "A good understanding." : feedback.score > 0 ? "Part of the picture." : "A useful place to learn."}</h2></div><strong className="qa-answer-score">{feedback.score}<span> / 10</span></strong></div>
+    <p>{feedback.explanation}</p>
+    <div className="qa-answer-review"><p><b>Your answer:</b> {q.options.filter((o) => feedback.selected.includes(o.id)).map((o) => o.text).join("; ")}</p><p><b>Correct answer{feedback.correct.length > 1 ? "s" : ""}:</b> {q.options.filter((o) => feedback.correct.includes(o.id)).map((o) => o.text).join("; ")}</p></div>
+    <h3>Understand the idea</h3><References items={feedback.references} />
+    <div className="qa-question-feedback"><fieldset disabled={busy}><legend>Was this question useful?</legend><div className="qa-stars">{[1, 2, 3, 4, 5].map((rating) => <button key={rating} type="button" aria-label={`Rate ${rating} out of 5 stars`} aria-pressed={feedback.rating === rating} onClick={() => onRate({ questionId: q.id, rating })} className={(feedback.rating ?? 0) >= rating ? "selected" : ""}>★</button>)}</div>{feedback.rating ? <small role="status">Saved: {feedback.rating}/5 stars</small> : null}</fieldset>
+      <label>Report an issue<select disabled={busy} value={feedback.flag ?? ""} onChange={(e) => onRate({ questionId: q.id, flag: e.target.value || null })}><option value="">No issue reported</option><option value="incorrect">Answer seems incorrect</option><option value="unclear">Question is unclear</option><option value="too_difficult">Too difficult for this level</option><option value="source">Source needs review</option></select>{feedback.flag ? <small role="status">Saved for editorial review.</small> : null}</label>
     </div>
-  );
+  </section>;
 }
 
-function CoverageNotice({ analysis }: { analysis: InterviewAnalysis }) {
-  const { t } = useInterfaceLanguage();
-  return (
-    <>
-      <section className="coverage-notice" aria-label={t.preparation.coverageAria}>
-        <div>
-          <p>{t.preparation.companyData}</p>
-          <strong>{analysis.companyCoverage === "Strong" ? t.preparation.strong : t.preparation.limited}</strong>
-          <span className={`analysis-mode ${analysis.analysisMode}`}>{t.preparation.liveResearch}</span>
-        </div>
-        <p>{analysis.companyCoverage === "Strong" ? t.preparation.strongNote : t.preparation.limitedNote}</p>
-      </section>
-      {analysis.researchSources.length ? (
-        <section className="research-sources" aria-labelledby="research-sources-title">
-          <div><p className="eyebrow">{t.preparation.evidence}</p><h2 id="research-sources-title">{t.preparation.sourcesUsed(analysis.researchSources.length)}</h2></div>
-          <div className="research-source-links">
-            {analysis.researchSources.map((source) => <a href={source.url} key={source.id} target="_blank" rel="noreferrer"><span>{source.title}</span><small>{source.domain}</small></a>)}
-          </div>
-        </section>
-      ) : null}
-    </>
-  );
-}
-
-function Overview({ analysis, onQuestions, onPractice }: { analysis: InterviewAnalysis; onQuestions: () => void; onPractice: () => void }) {
-  const { t } = useInterfaceLanguage();
-  return (
-    <main className="page prepared-page">
-      <PreparationHeader analysis={analysis} />
-      <CoverageNotice analysis={analysis} />
-
-      {analysis.companySignals.length ? (
-        <section className="company-signal-section" aria-labelledby="company-signal-heading">
-          <div>
-            <p className="eyebrow">{t.preparation.companySignals}</p>
-            <h2 id="company-signal-heading">{t.preparation.companySignalsTitle}</h2>
-            <p>{t.preparation.companySignalsIntro}</p>
-          </div>
-          <ol>
-            {analysis.companySignals.map((item, index) => (
-              <li key={`${item.signal}-${index}`}>
-                <p>{item.signal}</p>
-                <div>
-                  {item.evidence.map((source) => <a href={source.url} key={source.id} target="_blank" rel="noreferrer">{source.domain}</a>)}
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-
-      <section className="focus-section" aria-labelledby="focus-heading">
-        <div className="section-heading"><div><p className="eyebrow">{t.preparation.likelyFocus}</p><h2 id="focus-heading">{t.preparation.explore}</h2></div><p>{t.preparation.focusIntro}</p></div>
-        <div className="focus-list">
-          {analysis.focusAreas.map((area) => <div key={area.label}><span>{localizeFocusArea(area.label, t)}</span><strong>{t.priorityLabels[area.priority]}</strong></div>)}
-        </div>
-      </section>
-
-      <section className="next-actions" aria-labelledby="choose-heading">
-        <div className="section-heading"><div><p className="eyebrow">{t.preparation.choose}</p><h2 id="choose-heading">{t.preparation.ready}</h2></div></div>
-        <div className="action-options">
-          <button type="button" onClick={onQuestions}><span>01</span><p><strong>{t.preparation.viewQuestions}</strong><small>{t.preparation.viewQuestionsIntro}</small></p><b aria-hidden="true">→</b></button>
-          <button type="button" onClick={onPractice}><span>02</span><p><strong>{t.preparation.practiceInterview}</strong><small>{t.preparation.practiceIntro}</small></p><b aria-hidden="true">→</b></button>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function QuestionRow({ question, index, onPractice }: { question: PreparationQuestion; index: number; onPractice: (questionId: string) => void }) {
-  const { t } = useInterfaceLanguage();
-  const [openPanel, setOpenPanel] = useState<"reason" | "approach" | null>(null);
-  return (
-    <article className="question-row">
-      <span className="question-number">{String(index + 1).padStart(2, "0")}</span>
-      <div className="question-content">
-        <h3>{question.question}</h3>
-        <p className="source-line">{question.sources.map((source) => t.sourceLabels[source]).join(" · ")}<span>{t.specificityLabels[question.specificity]}</span></p>
-        {question.evidence.length ? (
-          <div className="question-evidence" aria-label={t.questions.evidence}>
-            <span>{t.questions.evidence}</span>
-            {question.evidence.map((source) => <a href={source.url} key={source.id} target="_blank" rel="noreferrer">{source.domain}</a>)}
-          </div>
-        ) : null}
-        <div className="question-actions">
-          <button type="button" aria-expanded={openPanel === "reason"} onClick={() => setOpenPanel(openPanel === "reason" ? null : "reason")}>{t.questions.why}</button>
-          <button type="button" aria-expanded={openPanel === "approach"} onClick={() => setOpenPanel(openPanel === "approach" ? null : "approach")}>{t.questions.approach}</button>
-          <button className="practice-link" type="button" onClick={() => onPractice(question.id)}>{t.questions.practice} <span aria-hidden="true">→</span></button>
-        </div>
-        {openPanel === "reason" ? <div className="question-detail"><strong>{t.questions.whyTitle}</strong><p>{question.reason}</p></div> : null}
-        {openPanel === "approach" ? <div className="question-detail"><strong>{t.questions.approachTitle}</strong><ul>{question.approach.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
-      </div>
-    </article>
-  );
-}
-
-function Questions({ analysis, onPractice }: { analysis: InterviewAnalysis; onPractice: (questionId?: string) => void }) {
-  const { t } = useInterfaceLanguage();
-  const categories = useMemo(() => Array.from(new Set(analysis.questions.map((question) => question.category))), [analysis.questions]);
-  const [category, setCategory] = useState<"All questions" | QuestionCategory>("All questions");
-  const displayed = category === "All questions" ? analysis.questions : analysis.questions.filter((question) => question.category === category);
-  return (
-    <main className="page prepared-page questions-page">
-      <PreparationHeader analysis={analysis} />
-      <div className="section-heading question-heading"><div><p className="eyebrow">{t.questions.sheet}</p><h2>{t.questions.title}</h2></div><p>{t.questions.intro}</p></div>
-
-      {analysis.cvAreas.length ? (
-        <section className="cv-insight" aria-labelledby="cv-insight-heading">
-          <div><p className="eyebrow">{t.questions.cvReview}</p><h2 id="cv-insight-heading">{t.questions.cvAreas}</h2></div>
-          <div>{analysis.cvAreas.map((area) => <p key={area.label}><span>{localizeFocusArea(area.label, t)}</span><strong>{t.priorityLabels[area.priority]}</strong></p>)}</div>
-        </section>
-      ) : (
-        <section className="cv-unavailable"><strong>{t.questions.noCv}</strong><p>{t.questions.noCvIntro}</p></section>
-      )}
-
-      <div className="question-filters" role="group" aria-label={t.questions.filterAria}>
-        {(["All questions", ...categories] as const).map((item) => <button className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)} type="button">{item === "All questions" ? t.questions.all : t.categoryLabels[item]}</button>)}
-      </div>
-      <section className="question-list" aria-label={t.questions.listAria}>
-        {displayed.map((question) => <QuestionRow key={question.id} question={question} index={analysis.questions.indexOf(question)} onPractice={onPractice} />)}
-      </section>
-    </main>
-  );
-}
-
-function ChoiceGroup<T extends string>({ label, options, value, onChange, getLabel = (option) => option }: { label: string; options: T[]; value: T; onChange: (value: T) => void; getLabel?: (option: T) => string }) {
-  return (
-    <fieldset className="choice-group"><legend>{label}</legend><div>{options.map((option) => <button aria-pressed={value === option} className={value === option ? "selected" : ""} key={option} type="button" onClick={() => onChange(option)}>{getLabel(option)}</button>)}</div></fieldset>
-  );
-}
-
-function PracticeSetup({ analysis, error, onStart }: { analysis: InterviewAnalysis; error: string | null; onStart: (mode: PracticeMode, focus: PracticeFocus, duration: PracticeDuration) => Promise<void> }) {
-  const { t } = useInterfaceLanguage();
-  const [mode, setMode] = useState<PracticeMode>("Practice");
-  const [focus, setFocus] = useState<PracticeFocus>("Full Interview");
-  const [duration, setDuration] = useState<PracticeDuration>("30 min");
-  const [starting, setStarting] = useState(false);
-  async function begin() {
-    setStarting(true);
-    try {
-      await onStart(mode, focus, duration);
-    } finally {
-      setStarting(false);
-    }
-  }
-  return (
-    <main className="page prepared-page practice-setup-page">
-      <PreparationHeader analysis={analysis} />
-      <div className="page-heading short-heading"><p className="eyebrow">{t.practice.eyebrow}</p><h2>{t.practice.title}</h2><p>{t.practice.intro}</p></div>
-      <section className="practice-options">
-        <fieldset className="mode-choice"><legend>{t.practice.chooseMode}</legend><div>
-          <button aria-pressed={mode === "Real Interview"} className={mode === "Real Interview" ? "selected" : ""} onClick={() => setMode("Real Interview")} type="button"><strong>{t.practice.real}</strong><small>{t.practice.realIntro}</small></button>
-          <button aria-pressed={mode === "Practice"} className={mode === "Practice" ? "selected" : ""} onClick={() => setMode("Practice")} type="button"><strong>{t.practice.practice}</strong><small>{t.practice.practiceIntro}</small></button>
-        </div></fieldset>
-        <ChoiceGroup label={t.practice.focus} options={["Full Interview", "Technical", "HR / Behavioral", "CV Deep Dive"]} value={focus} onChange={setFocus} getLabel={(option) => t.practice.focusLabels[option]} />
-        <ChoiceGroup label={t.practice.duration} options={["15 min", "30 min", "45 min"]} value={duration} onChange={setDuration} />
-        <div className="practice-start"><p>{t.practice.questionCount(analysis.questions.length)}</p><button className="button button-primary" disabled={starting} onClick={begin} type="button">{starting ? "Starting…" : t.practice.start} <span aria-hidden="true">→</span></button></div>
-        {error ? <p className="form-error" role="alert">{error}</p> : null}
-      </section>
-    </main>
-  );
-}
-
-function formatCountdown(remainingMs: number): string {
-  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function PracticeActive({
-  analysis,
-  mode,
-  questions,
-  sessionId,
-  initialQuestionId,
-  durationMinutes,
-  onFinish,
-}: {
-  analysis: InterviewAnalysis;
-  mode: PracticeMode;
-  questions: PreparationQuestion[];
-  sessionId: string;
-  initialQuestionId: string | null;
-  durationMinutes: number;
-  onFinish: (completed: number) => void;
-}) {
-  const { t } = useInterfaceLanguage();
-  const requestedIndex = initialQuestionId ? questions.findIndex((question) => question.id === initialQuestionId) : 0;
-  const initialIndex = Math.max(0, requestedIndex);
-  const [index, setIndex] = useState(initialIndex);
-  const [answer, setAnswer] = useState("");
-  const [followUp, setFollowUp] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<PracticeFeedback | null>(null);
-  const [pendingResult, setPendingResult] = useState<Awaited<ReturnType<typeof submitPracticeAnswer>> | null>(null);
-  const [processing, setProcessing] = useState(false);
+export default function AssessmentPage() {
+  const [level, setLevel] = useState<Level>("Junior");
+  const [topicIds, setTopicIds] = useState<string[]>(defaultTopics.Junior);
+  const [companyMode, setCompanyMode] = useState(false);
+  const [company, setCompany] = useState("");
+  const [assessment, setAssessment] = useState<AssessmentView | null>(null);
+  const [screen, setScreen] = useState<"setup" | "assessment">("setup");
+  const [acknowledged, setAcknowledged] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [answeredTurns, setAnsweredTurns] = useState(0);
-  const [expectedTurns, setExpectedTurns] = useState(questions.length);
-  const [remainingMs, setRemainingMs] = useState(durationMinutes * 60_000);
-  const deadlineRef = useRef<number | null>(null);
-  const current = questions[index];
-
-  useEffect(() => {
-    deadlineRef.current = Date.now() + durationMinutes * 60_000;
-    const interval = window.setInterval(() => {
-      const deadline = deadlineRef.current;
-      setRemainingMs(deadline === null ? 0 : Math.max(0, deadline - Date.now()));
-    }, 1_000);
-    return () => window.clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function advance(result: Awaited<ReturnType<typeof submitPracticeAnswer>>) {
-    const nextAnswered = answeredTurns + 1;
-    setAnsweredTurns(nextAnswered);
-    if (result.followUp) {
-      setExpectedTurns((value) => value + 1);
-      setFollowUp(result.followUp);
-    } else if (result.sessionComplete) {
-      onFinish(nextAnswered);
-      return;
-    } else if (result.nextQuestion) {
-      setIndex((value) => value + 1);
-      setFollowUp(null);
-    }
-    setAnswer("");
-    setFeedback(null);
-    setPendingResult(null);
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (answer.trim().length < 30 || processing) return;
-    setProcessing(true);
-    setError(null);
-    try {
-      const result = await submitPracticeAnswer({ sessionId, answer: answer.trim() });
-      if (mode === "Practice") {
-        setFeedback(result.feedback);
-        setPendingResult(result);
-      } else {
-        advance(result);
-      }
-    } catch {
-      setError("Your answer could not be evaluated. Please try again.");
-    } finally {
-      setProcessing(false);
-    }
-  }
-
-  const currentTurn = Math.min(answeredTurns + 1, expectedTurns);
-  const progressLabel = t.active.questionProgress(currentTurn, expectedTurns);
-  const timeExpired = remainingMs <= 0;
-
-  return (
-    <main className="page active-interview-page">
-      <div className="active-context"><button disabled={answeredTurns === 0 || processing} type="button" onClick={() => onFinish(answeredTurns)}>{t.active.end}</button><p><strong>{analysis.details.company} · {analysis.details.role}</strong><span>{t.stageLabels[analysis.details.stage]} · {t.practice.modeLabels[mode]}</span></p><p>{progressLabel}<span className={timeExpired ? "time-remaining expired" : "time-remaining"}>{timeExpired ? t.active.timeUp : t.active.timeRemaining(formatCountdown(remainingMs))}</span></p></div>
-      <div className="interview-progress" aria-label={progressLabel}><span style={{ width: `${(answeredTurns / expectedTurns) * 100}%` }} /></div>
-      <section className="interview-question" aria-live="polite">
-        <p className="interviewer-label">{t.active.interviewer}</p>
-        <h1>{followUp ?? current.question}</h1>
-        {!followUp ? <p className="source-line">{t.active.selectedFrom}: {current.sources.map((source) => t.sourceLabels[source]).join(" · ")}</p> : <p className="source-line">{t.active.followUpTopic}</p>}
-      </section>
-      <form className="answer-form" onSubmit={submit}>
-        <label htmlFor="candidate-answer">{t.active.answer}</label>
-        <textarea id="candidate-answer" maxLength={2500} rows={8} autoFocus placeholder={t.active.placeholder} value={answer} onChange={(event) => setAnswer(event.target.value)} disabled={Boolean(feedback) || processing} />
-        <div className="answer-footer"><span>{answer.length} / 2,500</span><button className="button button-primary" disabled={answer.trim().length < 30 || Boolean(feedback) || processing} type="submit">{processing ? "Evaluating…" : t.active.submit}</button></div>
-      </form>
-      {error ? <p className="form-error" role="alert">{error}</p> : null}
-      {feedback ? (
-        <section className="inline-feedback" aria-live="polite">
-          <div><p className="eyebrow">{t.active.feedback}</p><h2>{t.active.feedbackTitle}</h2></div>
-          <div className="feedback-columns"><div><strong>{t.active.strongPoints}</strong><ul>{feedback.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div><div><strong>{t.active.improve}</strong><ul>{feedback.improvements.map((item) => <li key={item}>{item}</li>)}</ul></div></div>
-          <button className="button button-primary" type="button" onClick={() => pendingResult && advance(pendingResult)}>{t.active.continue} <span aria-hidden="true">→</span></button>
-        </section>
-      ) : null}
-    </main>
-  );
-}
-
-function Report({ analysis, mode, completed, report, onQuestions, onRestart }: { analysis: InterviewAnalysis; mode: PracticeMode; completed: number; report: PracticeReport; onQuestions: () => void; onRestart: () => void }) {
-  const { t } = useInterfaceLanguage();
-  return (
-    <main className="page prepared-page report-page">
-      <PreparationHeader analysis={analysis} />
-      <section className="report-intro"><p className="eyebrow">{t.report.complete}</p><h2>{t.report.title}</h2><p>{report.summary || t.report.summary(completed, t.practice.modeLabels[mode])}</p></section>
-      <div className="report-grid">
-        <section><p className="eyebrow">{t.report.worked}</p><h3>{t.report.keep}</h3><ul>{report.strengths.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section><p className="eyebrow">{t.report.improve}</p><h3>{t.report.credible}</h3><ul>{report.improvements.map((item) => <li key={item}>{item}</li>)}</ul></section>
-      </div>
-      <section className="recommended-next"><div><span>{t.report.next}</span><strong>{report.recommendation}</strong></div><button className="button button-secondary" onClick={onQuestions} type="button">{t.report.viewQuestions}</button><button className="button button-primary" onClick={onRestart} type="button">{t.report.practiceAgain}</button></section>
-    </main>
-  );
-}
-
-function ReportLoading({ error, onRetry }: { error: string | null; onRetry: () => void }) {
-  const { language } = useInterfaceLanguage();
-  return (
-    <main className="page analysis-page" aria-live="polite" aria-busy={!error}>
-      <section className="analysis-panel">
-        <p className="eyebrow">{language === "az" ? "Yekun hesabat" : "Final report"}</p>
-        <h1>{error ? (language === "az" ? "Hesabat hazır olmadı" : "The report is not ready") : (language === "az" ? "Cavablarınız təhlil edilir" : "Analyzing your answers")}</h1>
-        <p className="analysis-context">{error ?? (language === "az" ? "Güclü tərəflər və növbəti addımlar hazırlanır…" : "Preparing strengths, improvements and your next step…")}</p>
-        {error ? <button className="button button-primary" onClick={onRetry} type="button">{language === "az" ? "Yenidən yoxla" : "Try again"}</button> : null}
-      </section>
-    </main>
-  );
-}
-
-export default function HomePage() {
-  const [uiLanguage, setUiLanguage] = useState<UiLanguage>("en");
-  const [view, setView] = useState<View>("home");
-  const [details, setDetails] = useState<InterviewDetails>(initialDetails);
-  const [analysis, setAnalysis] = useState<InterviewAnalysis | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress>({ stepIndex: 0, phase: null, elapsedMs: 0, slow: false });
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [practiceMode, setPracticeMode] = useState<PracticeMode>("Practice");
-  const [practiceQuestions, setPracticeQuestions] = useState<PreparationQuestion[]>([]);
-  const [practiceDurationMinutes, setPracticeDurationMinutes] = useState(15);
-  const [initialQuestionId, setInitialQuestionId] = useState<string | null>(null);
-  const [practiceSessionId, setPracticeSessionId] = useState<string | null>(null);
-  const [practiceError, setPracticeError] = useState<string | null>(null);
-  const [practiceReport, setPracticeReport] = useState<PracticeReport | null>(null);
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [completedQuestions, setCompletedQuestions] = useState(0);
-  const t = uiCopy[uiLanguage];
-
-  useEffect(() => {
-    document.documentElement.lang = uiLanguage;
-  }, [uiLanguage]);
+  const [finishPrompt, setFinishPrompt] = useState(false);
+  const requestId = useRef<string | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const feedback = assessment?.feedback;
+  const showingFeedback = screen === "assessment" && feedback && acknowledged !== feedback.question.id;
+  const question = assessment?.question;
+  const finished = screen === "assessment" && assessment?.status === "completed" && !showingFeedback;
 
   useEffect(() => {
     let active = true;
-    loadRecentPreparation().then((recent) => {
-      if (active && recent) setAnalysis((current) => current ?? recent);
-    }).catch(() => undefined);
+    api("/api/assessments").then((saved) => { if (active) setAssessment(saved); })
+      .catch((e: Error) => { if (active) setError(e.message); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
+  useEffect(() => { if (screen === "assessment") heading.current?.focus(); }, [screen, question?.id, showingFeedback, finished]);
 
-  function changeUiLanguage(language: UiLanguage) {
-    setUiLanguage(language);
-  }
-
-  async function analyze() {
-    setAnalysisError(null);
-    setAnalysisProgress({ stepIndex: 0, phase: null, elapsedMs: 0, slow: false });
-    setView("analyzing");
+  function changeLevel(next: Level) { setLevel(next); setTopicIds(defaultTopics[next]); requestId.current = null; }
+  async function start(event: FormEvent) {
+    event.preventDefault();
+    if (busy || !topicIds.length) return;
+    setBusy(true); setError(null);
+    requestId.current ??= crypto.randomUUID();
     try {
-      const result = await prepareInterview({ ...details, company: details.company.trim(), role: details.role.trim(), jobDescription: details.jobDescription.trim(), jobUrl: details.jobUrl.trim() }, setAnalysisProgress);
-      setAnalysis(result);
-      setView("overview");
-    } catch {
-      setAnalysisError(t.form.prepareError);
-      setView("form");
-    }
+      const saved = await api("/api/assessments", { requestId: requestId.current, level, topicIds, company: companyMode ? company : null });
+      setAssessment(saved); setAcknowledged(null); setSelected([]); setFinishPrompt(false); setScreen("assessment"); requestId.current = null;
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
   }
-
-  async function beginPractice(mode: PracticeMode, focus: PracticeFocus, duration: PracticeDuration, questionId: string | null = null) {
-    if (!analysis) return;
-    setPracticeError(null);
-    let selected = analysis.questions;
-    if (focus === "Technical") selected = selected.filter((question) => ["Technical Questions", "System Design"].includes(question.category));
-    if (focus === "HR / Behavioral") selected = selected.filter((question) => question.category === "HR / Recruiter");
-    if (focus === "CV Deep Dive") selected = selected.filter((question) => question.category === "CV Questions");
-    if (!selected.length) selected = analysis.questions;
-    if (questionId) selected = selected.filter((question) => question.id === questionId);
-    if (!selected.length) selected = analysis.questions.slice(0, 1);
+  async function mutate(input: object) {
+    if (!assessment || busy) return;
+    setBusy(true); setError(null);
     try {
-      const started = await startPractice({
-        preparationId: analysis.id,
-        mode,
-        focus,
-        duration,
-        questionIds: selected.map((question) => question.id),
-      });
-      setPracticeSessionId(started.sessionId);
-    } catch {
-      setPracticeError("The practice session could not be started. Please try again.");
-      return;
-    }
-    setPracticeMode(mode);
-    setPracticeQuestions(selected);
-    setPracticeDurationMinutes(Number.parseInt(duration, 10));
-    setInitialQuestionId(questionId);
-    setView("practice-active");
+      const saved = await api(`/api/assessments/${assessment.id}`, input);
+      setAssessment(saved); setSelected([]); setFinishPrompt(false);
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
   }
-
-  async function practiceOne(questionId?: string) {
-    await beginPractice("Practice", "Full Interview", "15 min", questionId ?? null);
+  async function reload() {
+    setBusy(true); setError(null);
+    try { setAssessment(await api(assessment ? `/api/assessments/${assessment.id}` : "/api/assessments")); setSelected([]); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
   }
+  function newAssessment() { setScreen("setup"); setError(null); setFinishPrompt(false); requestId.current = null; }
 
-  async function finishPractice(completed: number) {
-    if (!practiceSessionId) return;
-    setCompletedQuestions(completed);
-    setReportError(null);
-    setView("report-loading");
-    try {
-      const report = await finishPracticeSession(practiceSessionId);
-      setPracticeReport(report);
-      setView("report");
-    } catch {
-      setReportError("The report could not be generated. Your saved answers are safe; please try again.");
-    }
-  }
-
-  return (
-    <InterfaceLanguageContext.Provider value={{ language: uiLanguage, setLanguage: changeUiLanguage, t }}>
-      <Header analysis={analysis} activeView={view} onNavigate={setView} />
-      {view === "home" ? <Home recent={analysis} onStart={() => setView("form")} onOpen={() => setView("overview")} /> : null}
-      {view === "form" ? <InterviewForm value={details} error={analysisError} onChange={setDetails} onSubmit={analyze} /> : null}
-      {view === "analyzing" ? <Analyzing details={details} progress={analysisProgress} /> : null}
-      {view === "overview" && analysis ? <Overview analysis={analysis} onQuestions={() => setView("questions")} onPractice={() => setView("practice-setup")} /> : null}
-      {view === "questions" && analysis ? <Questions analysis={analysis} onPractice={practiceOne} /> : null}
-      {view === "practice-setup" && analysis ? <PracticeSetup analysis={analysis} error={practiceError} onStart={beginPractice} /> : null}
-      {view === "practice-active" && analysis && practiceSessionId ? <PracticeActive key={practiceSessionId} analysis={analysis} mode={practiceMode} questions={practiceQuestions.length ? practiceQuestions : analysis.questions} sessionId={practiceSessionId} initialQuestionId={initialQuestionId} durationMinutes={practiceDurationMinutes} onFinish={finishPractice} /> : null}
-      {view === "report-loading" ? <ReportLoading error={reportError} onRetry={() => finishPractice(completedQuestions)} /> : null}
-      {view === "report" && analysis && practiceReport ? <Report analysis={analysis} mode={practiceMode} completed={completedQuestions} report={practiceReport} onQuestions={() => setView("questions")} onRestart={() => { setPracticeReport(null); setPracticeSessionId(null); setView("practice-setup"); }} /> : null}
-    </InterfaceLanguageContext.Provider>
-  );
+  return <div className="qa-app">
+    <header className="qa-header"><div><button className="brand" type="button" onClick={newAssessment} disabled={busy}><span>IP</span><b>Interview Prep</b></button><span className="qa-header-label">Java knowledge assessment</span><a href={roadmapUrl} target="_blank" rel="noreferrer">Explore the roadmap ↗</a></div></header>
+    <main className="qa-main">
+      {error ? <div className="qa-error" role="alert"><p>{error}</p><button type="button" disabled={busy} onClick={reload}>Reload saved assessment</button></div> : null}
+      {screen === "setup" ? <>
+        <section className="qa-hero"><div><p className="eyebrow">Know where you stand. Know what’s next.</p><h1>Build confidence in<br /><em>your Java knowledge.</em></h1><p className="qa-lead">A focused check of the ideas behind the code. Start with the basics, find your strengths, and leave with a clear next step.</p><div className="qa-hero-pills"><span>Single & multiple choice</span><span>Instant scores</span><span>No CV needed</span></div></div>
+          <aside className="qa-preview" aria-label="Example of answer feedback"><div className="qa-preview-top"><span>THE IDEA, NOT THE SYNTAX</span><span>Java</span></div><p>Why use dependency injection?</p><div className="qa-preview-option"><span aria-hidden="true">✓</span> Make dependencies explicit and easier to test.</div><div className="qa-preview-score"><div><small>EXAMPLE ANSWER SCORE</small><strong>10 <span>/ 10</span></strong></div><span className="qa-example">Illustrative example</span></div><p className="qa-preview-note">Understand the concept. Get feedback. Go one step deeper.</p></aside>
+        </section>
+        {loading ? <p role="status">Checking for a saved assessment…</p> : assessment ? <section className="qa-resume"><div><b>{assessment.status === "active" ? "Your assessment is saved" : "Your latest result"}</b><span>{assessment.level} · {assessment.answered} answered{assessment.percent !== null ? ` · ${assessment.percent}%` : ""}</span></div><button type="button" className="button button-secondary" onClick={() => { setScreen("assessment"); setAcknowledged(assessment.status === "completed" ? assessment.feedback?.question.id ?? null : null); setError(null); }}>{assessment.status === "active" ? "Continue assessment →" : "View result →"}</button></section> : null}
+        <form onSubmit={start} className="qa-setup">
+          <div className="qa-section-heading"><div><p className="eyebrow">Your starting point</p><h2>Make this assessment yours.</h2></div><p>Questions in English · About 10–15 minutes</p></div>
+          <fieldset className="qa-levels" disabled={busy}><legend>1. Choose the level you want to check</legend><div>{levels.map((item, i) => <label key={item} className={level === item ? "active" : ""}><input type="radio" name="level" checked={level === item} onChange={() => changeLevel(item)} /><span className="qa-level-number">0{i + 1}</span><b>{item}</b><small>{item === "Junior" ? "Everyday Java & backend foundations" : item === "Mid" ? "Production services & AI integration" : "Concurrency, distributed systems & AI reliability"}</small><span className="qa-radio-dot" aria-hidden="true" /></label>)}</div></fieldset>
+          <fieldset className="qa-topics" disabled={busy}><legend>2. Pick up to six topics <span>{topicIds.length} selected</span></legend><div>{availableTopics(level).map((topic) => <label key={topic.id} className={topicIds.includes(topic.id) ? "active" : ""}><input type="checkbox" checked={topicIds.includes(topic.id)} disabled={!topicIds.includes(topic.id) && topicIds.length >= 6} onChange={(e) => { setTopicIds(e.target.checked ? [...topicIds, topic.id] : topicIds.filter((id) => id !== topic.id)); requestId.current = null; }} /><span><b>{topic.title}</b><small>{topic.summary}</small></span></label>)}</div></fieldset>
+          <div className="qa-company"><label className="qa-toggle"><input type="checkbox" checked={companyMode} disabled={busy} onChange={(e) => { setCompanyMode(e.target.checked); requestId.current = null; }} /><span><b>Add company context</b><small>Optional. Your assessment is general by default.</small></span></label>{companyMode ? <div className="qa-company-input"><label>Company name<input disabled={busy} required value={company} maxLength={100} placeholder="e.g. PASHA Bank or Revolut" onChange={(e) => { setCompany(e.target.value); requestId.current = null; }} /></label><p>Only sourced interview evidence is used. If none is available, you’ll receive general questions. Company questions never exceed 20% of the assessment.</p></div> : null}</div>
+          <div className="qa-start"><div><b>Start simple. Build from there.</b><p>Up to {topicIds.length * 3} questions. Strong answers unlock harder ones.<br />If a question trips you up, we’ll move to the next topic.</p></div><button type="submit" className="button button-primary" disabled={busy || loading || !topicIds.length || (companyMode && !company.trim())}>{busy ? "Preparing…" : "Start assessment"} <span aria-hidden="true">→</span></button></div>
+        </form>
+        <p className="qa-roadmap-note">Scope guided by the <a href={roadmapUrl} target="_blank" rel="noreferrer">Ingress Academy Java & AI Engineer roadmap</a>. Questions focus on understanding, with references for further study.</p>
+      </> : assessment ? <>
+        <div className="qa-session-heading"><div><p className="eyebrow">{finished ? "Your knowledge snapshot" : `${assessment.level} · Java assessment`}</p><h1 ref={heading} tabIndex={-1}>{finished ? "A clearer picture of your progress." : showingFeedback ? "Learn from each answer." : topics.find((t) => t.id === question?.topic)?.title}</h1></div><button type="button" className="qa-text-button" disabled={busy} onClick={newAssessment}>New assessment</button></div>
+        {assessment.companyNotice ? <p className="qa-notice">{assessment.companyNotice}</p> : null}
+        {!finished ? <>
+          <div className="qa-progress-label"><span>{assessment.answered} answered · Up to {assessment.maximumQuestions} questions</span><b>{assessment.earned} / {assessment.possible} points earned</b></div><progress className="qa-progress" value={assessment.completedTopics} max={assessment.totalTopics} aria-label={`${assessment.completedTopics} of ${assessment.totalTopics} topics completed`} />
+          {showingFeedback && feedback ? <><Feedback feedback={feedback} busy={busy} onRate={(input) => mutate({ action: "feedback", ...input })} /><div className="qa-next"><p>{assessment.status === "completed" ? "Your assessment is complete." : feedback.score < 7 ? "We’ll move to the next topic and keep this one in your study plan." : question?.topic === feedback.question.topic ? "Ready for a slightly deeper question?" : "Next, we’ll start with the basics of another topic."}</p><button type="button" className="button button-primary" disabled={busy} onClick={() => { setAcknowledged(feedback.question.id); setError(null); }}>{assessment.status === "completed" ? "See my result" : "Continue"} →</button></div></>
+          : question ? <section className="qa-question" key={question.id}><div className="qa-question-meta"><span>{question.type === "single" ? "Choose one answer" : "Select all correct answers"}</span><span>Complexity {question.complexity}/10</span></div><form onSubmit={(e) => { e.preventDefault(); mutate({ action: "answer", questionId: question.id, selected }); }}><fieldset disabled={busy}><legend>{question.prompt}</legend><div className="qa-options">{question.options.map((option, i) => <label key={option.id} className={selected.includes(option.id) ? "selected" : ""}><input type={question.type === "single" ? "radio" : "checkbox"} name="answer" value={option.id} checked={selected.includes(option.id)} onChange={(e) => setSelected(question.type === "single" ? [option.id] : e.target.checked ? [...selected, option.id] : selected.filter((id) => id !== option.id))} /><span className="qa-option-letter" aria-hidden="true">{String.fromCharCode(65 + i)}</span><span>{option.text}</span></label>)}</div></fieldset><div className="qa-question-source"><div className="qa-tags">{question.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><p>Source: <a href={question.source.url} target="_blank" rel="noreferrer">{question.source.title} ↗</a></p>{question.companyContexts.map((context) => <p key={context.company + context.role}><b>{context.company} — {context.role} interview question</b><br /><a href={context.source.url} target="_blank" rel="noreferrer">Source: {context.source.title} ↗</a></p>)}</div><div className="qa-question-submit"><p>{question.type === "multiple" ? "Partial credit for correct selections. Incorrect selections reduce the score; selecting every option earns 0." : "A correct answer earns 10 points."}</p><button type="submit" className="button button-primary" disabled={busy || !selected.length}>{busy ? "Saving…" : "Check answer"} →</button></div></form></section> : null}
+          {assessment.status === "active" && assessment.answered > 0 ? <div className="qa-finish-early">{finishPrompt ? <><p>Finish with {assessment.answered} answered questions? Your result will identify topics not yet assessed.</p><button disabled={busy} type="button" className="button button-secondary" onClick={() => mutate({ action: "finish" })}>Finish and see result</button><button type="button" disabled={busy} className="qa-text-button" onClick={() => setFinishPrompt(false)}>Keep going</button></> : <button className="qa-text-button" type="button" disabled={busy} onClick={() => setFinishPrompt(true)}>Finish assessment early</button>}</div> : null}
+        </> : <>
+          <section className="qa-result-hero"><div><p className="eyebrow">Overall score</p><strong className="qa-total-score">{assessment.percent ?? 0}<span>%</span></strong><p className="qa-total-points">{assessment.earned} / {assessment.possible} points · {assessment.answered} answers</p></div><div><span className="qa-result-level">{assessment.level} scope</span><h2>{assessment.percent !== null && assessment.percent >= 80 ? "Keep building on your strengths." : "Your next steps are in focus."}</h2><p>{assessment.summary}</p>{assessment.finishedEarly ? <p><b>Finished early.</b> Only submitted answers count toward your score.</p> : null}<p className="qa-muted">Adaptive assessments cover different questions. Percentages describe this attempt and should not be used to rank students.</p></div></section>
+          <section className="qa-results"><h2>Your strengths & next steps</h2><p>Difficulty reached is the highest complexity answered with at least 7/10. A short sample cannot establish mastery of a whole topic.</p><div className="qa-table-wrap"><table><thead><tr><th scope="col">Topic</th><th scope="col">Points</th><th scope="col">Difficulty reached</th><th scope="col">Next step</th></tr></thead><tbody>{assessment.results.map((r) => <tr key={r.id}><th scope="row">{r.title}<small>{r.answered} answered</small></th><td>{r.possible ? `${r.earned} / ${r.possible}` : "—"}</td><td>{r.highestPassed === null ? "—" : `${r.highestPassed}/10`}</td><td><span className={`qa-status ${r.status}`}>{r.status === "strong" ? "Strength in this sample" : r.status === "developing" ? "Keep practicing" : r.status === "revisit" ? "Revisit the foundations" : "Not assessed"}</span></td></tr>)}</tbody></table></div></section>
+          <section className="qa-study"><div className="qa-section-heading"><div><p className="eyebrow">Make your next session count</p><h2>Your study plan</h2></div></div><div className="qa-study-grid">{assessment.results.filter((r) => r.references.length).map((r) => <article key={r.id}><h3>{r.title}</h3><p>Review the concepts behind the answers you missed.</p><References items={r.references} /></article>)}{assessment.results.every((r) => !r.references.length) ? <article><h3>Ready to broaden your practice?</h3><p>Try additional topics or a higher level when you feel ready.</p><References items={[{ title: "Explore the Java engineer roadmap", url: roadmapUrl }]} /></article> : null}</div></section>
+          <section className="qa-history"><h2>Review your answers</h2>{assessment.history.map((answer, i) => <details key={answer.question.id}><summary><span>{i + 1}. {answer.question.prompt}</span><b>{answer.score}/10</b></summary><Feedback feedback={answer} busy={busy} onRate={(input) => mutate({ action: "feedback", ...input })} /></details>)}</section>
+          <div className="qa-result-actions"><button type="button" className="button button-primary" onClick={newAssessment}>Start another assessment →</button><button type="button" className="button button-secondary" onClick={() => window.print()}>Print / save result</button></div>
+        </>}
+      </> : null}
+    </main><footer className="qa-footer"><span>Interview Prep · Learn with clarity.</span><span>Java Q&A · General knowledge first</span></footer>
+  </div>;
 }

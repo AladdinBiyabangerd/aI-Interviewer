@@ -1,3 +1,4 @@
+import { publicInterviewGuard } from "../../../../../lib/server/interview-access";
 import { preparationById, refreshPreparation } from "../../../../../lib/server/analysis-jobs";
 import { json } from "../../../../../lib/server/http";
 import { sessionFor } from "../../../../../lib/server/session";
@@ -11,6 +12,8 @@ function uuid(value: string): boolean {
 }
 
 export async function GET(request: Request, context: { params: Promise<{ jobId: string }> }) {
+  const blocked = publicInterviewGuard();
+  if (blocked) return blocked;
   const session = sessionFor(request);
   const { jobId } = await context.params;
   if (!uuid(jobId)) return json({ code: "not_found" }, 404, session);

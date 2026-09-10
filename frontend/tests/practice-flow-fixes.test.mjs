@@ -35,7 +35,7 @@ test("report generation locks the session row before calling the model", async (
 });
 
 test("practice progress reflects answered turns, including follow-ups, not just the primary question index", async () => {
-  const page = await readFile(path.join(root, "app", "page.tsx"), "utf8");
+  const page = await readFile(path.join(root, "legacy", "page.tsx"), "utf8");
   const component = page.slice(page.indexOf("function PracticeActive"), page.indexOf("function Report("));
   assert.match(component, /answeredTurns/);
   assert.match(component, /expectedTurns/);
@@ -44,12 +44,12 @@ test("practice progress reflects answered turns, including follow-ups, not just 
 });
 
 test("a new practice session always remounts practice state instead of reusing a stale one", async () => {
-  const page = await readFile(path.join(root, "app", "page.tsx"), "utf8");
+  const page = await readFile(path.join(root, "legacy", "page.tsx"), "utf8");
   assert.match(page, /<PracticeActive key=\{practiceSessionId\}/);
 });
 
 test("the selected practice duration drives a real, visible countdown", async () => {
-  const page = await readFile(path.join(root, "app", "page.tsx"), "utf8");
+  const page = await readFile(path.join(root, "legacy", "page.tsx"), "utf8");
   assert.match(page, /durationMinutes/);
   assert.match(page, /setPracticeDurationMinutes\(Number\.parseInt\(duration, 10\)\)/);
   assert.match(page, /timeRemaining|timeUp/);
@@ -63,7 +63,7 @@ test("the loading screen reflects real elapsed time and backend research phase i
   const jobs = await readFile(path.join(root, "lib", "server", "analysis-jobs.ts"), "utf8");
   assert.match(jobs, /reviewing_cv/);
 
-  const page = await readFile(path.join(root, "app", "page.tsx"), "utf8");
+  const page = await readFile(path.join(root, "legacy", "page.tsx"), "utf8");
   assert.match(page, /waitingLines/);
   assert.match(page, /t\.analysis\.elapsed/);
 });

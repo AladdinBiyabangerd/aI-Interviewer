@@ -1,3 +1,4 @@
+import { publicInterviewGuard } from "../../../../lib/server/interview-access";
 import type { InterviewDetails, InterviewLanguage, InterviewStage, Seniority } from "../../../../lib/interview-api";
 import { analysisLimit, retentionDays } from "../../../../lib/server/config";
 import { database } from "../../../../lib/server/database";
@@ -83,6 +84,8 @@ function parseInput(value: unknown): InterviewDetails | null {
 }
 
 export async function POST(request: Request) {
+  const blocked = publicInterviewGuard();
+  if (blocked) return blocked;
   const session = sessionFor(request);
   let details: InterviewDetails | null = null;
   try {

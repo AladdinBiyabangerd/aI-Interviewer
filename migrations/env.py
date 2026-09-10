@@ -20,7 +20,7 @@ from ai_interviewer.core.config import Settings
 from ai_interviewer.file_security import models as file_security_models  # noqa: F401
 from ai_interviewer.identity import models as identity_models  # noqa: F401
 from ai_interviewer.knowledge import models as knowledge_models  # noqa: F401
-from ai_interviewer.persistence import interview_models  # noqa: F401
+from ai_interviewer.persistence import assessment_models, interview_models  # noqa: F401
 from ai_interviewer.persistence import models as persistence_models  # noqa: F401
 from ai_interviewer.persistence.base import PersistenceBase
 from ai_interviewer.persistence.database import database_connect_args

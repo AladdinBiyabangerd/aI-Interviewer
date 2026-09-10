@@ -1,3 +1,15 @@
+# Java assessment deployment update — September 10, 2026
+
+The public product is now the Java Q&A assessment. Apply migration `20260910_0016`
+and load/review/publish the bank as described in [the assessment guide](../java-assessment-mvp.md).
+Uploaded question sources follow the separate [private ingestion and rights-review
+workflow](../java-question-source-ingestion.md).
+Assessment traffic requires PostgreSQL, the session signing secret and the retention
+cron secret; it makes no OpenAI/Blob calls. The old interview generation, CV upload,
+OpenAI webhook and practice endpoints return 410. The historical instructions below
+describe retained interview infrastructure and cleanup obligations, not the current
+student onboarding flow. Do not re-enable provider processing for the assessment.
+
 # Vercel production deployment
 
 The production text application is a standard Next.js application in `frontend/`.

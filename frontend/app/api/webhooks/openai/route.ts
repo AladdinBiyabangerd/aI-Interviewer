@@ -1,3 +1,4 @@
+import { publicInterviewGuard } from "../../../../lib/server/interview-access";
 import { preparationByProviderResponse, refreshPreparation } from "../../../../lib/server/analysis-jobs";
 import { json } from "../../../../lib/server/http";
 import { unwrapOpenAIWebhook } from "../../../../lib/server/interview-ai";
@@ -6,6 +7,8 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
+  const blocked = publicInterviewGuard();
+  if (blocked) return blocked;
   let event: { type: string; data: { id: string } };
   try {
     event = await unwrapOpenAIWebhook(await request.text(), request.headers);

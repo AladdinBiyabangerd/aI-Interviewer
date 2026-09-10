@@ -1,4 +1,4 @@
-# Data Inventory through Phase 1B-D2.2a
+# Data Inventory through the Java assessment MVP
 
 ## Current boundary
 
@@ -19,10 +19,22 @@ continuous profiling supervisor exists. PostgreSQL stores
 both source text and profile JSON as
 AES-256-GCM ciphertext with keyed integrity metadata, never plaintext. There are no
 passwords, email/name account profiles, interview answers, transcripts, evaluations,
-embeddings, source-knowledge content, audio, or video.
+embeddings, audio, or video. Operator-supplied Java question sources can exist only in
+the private editorial staging tables described below.
+
+The public Java assessment adds short-retention anonymous browser sessions and question
+feedback. It stores selected option IDs and deterministic scores, without a CV, job
+description, open-ended answer, model request, email, name, or account identifier.
+Question content is editorial product data. The signed HttpOnly cookie is converted to
+a keyed owner hash before storage.
 
 | Store | Data | Classification | Purpose and boundary | Retention/deletion state |
 |---|---|---|---|---|
+| `java_question_bank` | Stable question ID/version, publication status, content digest, level/topic/tags, choice options, answer key, explanation, official references, optional sourced company context | Editorial product data; non-personal | Immutable reviewed question revisions for deterministic assessment. Draft/published/retired state is managed separately from content. | Retained for editorial history and reproducible session snapshots; retired instead of overwritten. |
+| `java_question_import_batches` | Source file name/title, author/publisher/year/reference, source SHA-256, parser release, page/question/answer counts, extraction report, rights and review status | Private editorial provenance; potentially copyrighted source metadata | Operator-only immutable extraction identity and review gate. No public API and no assessment-runtime read path. | Retained only while rights/editorial review or provenance requires it; rejection is explicit. A production retention period still needs owner approval. |
+| `java_question_import_candidates` | Source question key, chapter and source-page range, extracted prompt/choices, answer/explanation, normalized digest, parser issues and review status | Private editorial source material; potentially copyrighted | Deterministic extraction staging. It cannot be served as a live assessment question and has no automatic promotion path. | Cascades with its import batch. Remove rejected/unneeded batches under the approved source-material retention decision. |
+| `java_assessment_sessions` | UUID, keyed anonymous browser-owner hash, selected scope/company, immutable question snapshots, selected option IDs, deterministic scores, ratings/flags copied into the session, timestamps | Pseudonymous practice data | Resume one browser's assessment and reproduce its result without an account, CV, free-text answer, or model call. Owner-scoped reads/writes only. | Expires under `INTERVIEW_RETENTION_DAYS` (default 7) and is removed by the retention job. Cookie loss prevents recovery. |
+| `java_question_feedback` | Keyed anonymous browser-owner hash, exact question ID/version, 1–5 rating, bounded issue reason, pending/resolved state, timestamps | Pseudonymous product feedback | Aggregate usefulness and route reported questions to editorial review. No public admin endpoint and no free-text report. | Upserted per browser/question revision and expires under `INTERVIEW_RETENTION_DAYS`; review output omits owner hashes. |
 | `accounts` | UUIDv7, exact OIDC issuer/subject, active/disabled/deletion-pending state, timestamps/version | Pseudonymous personal data; security-sensitive | Sole mapping from external subject to local owner. No email, name, token, provider profile, or password. | Deleted after local erasure and processor acknowledgements. Issuer/subject never enter audit/outbox payloads. |
 | `privacy_policy_versions` | policy key/version, jurisdiction code, approval/status, minimum age, request deadline, notice URI/digest, effective dates | Public/legal metadata | Exact approved policy snapshot. Active rows require legal approval. | Retained while referenced; retirement is versioned, not overwritten. No policy is seeded by migration. |
 | `privacy_profiles` | owner ID, self-declared ISO country/subdivision, ordered jurisdiction/version snapshot, storage region, 18+ attestation, policy ID | Personal data | Routes privacy decisions without DOB or geolocation. | Account lifetime; cascade-deleted with the account. |
@@ -91,10 +103,10 @@ embeddings, source-knowledge content, audio, or video.
 - Telemetry contains only the allowlisted fields above. Trace/request IDs may correlate operational events but are never accepted as user identity or metric dimensions. Backend enrichment with client IP, geolocation, account data, or payload fields is forbidden.
 - Encrypted source-text and candidate-profile tables, durable extraction/profiling-job
   tables, an isolated parser worker, a separately disabled profiling worker, and
-  authenticated source-text/profile inspection/correction routes exist. There is no
-  continuous worker supervisor, public profiling-schedule route, vector extension,
-  embedding, full-text index, broker, Knowledge Base, RAG, or
-  crawler.
+  authenticated source-text/profile inspection/correction routes exist. Java question
+  source staging is deterministic and operator-only. There is no continuous worker
+  supervisor, public profiling-schedule route, vector extension, embedding, full-text
+  index, broker, Knowledge Base, RAG, or crawler.
 - Source-text AES-GCM AAD binds owner, document/source/revision identities, origin/predecessor, exact parser provenance, counts, keyed digest, and key identity. The context-bound HMAC avoids a global plaintext equality oracle.
 - Source-text storage reauthorizes purpose and rechecks active owner, draft/unexpired preparation, latest exact document version, released asset snapshots, delete-only retention, and exact active parser policy. LF-only and character/UTF-8 byte bounds reject unsafe Unicode control/format/surrogate input.
 - Database triggers prevent source identity reassignment and all revision updates; a

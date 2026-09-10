@@ -1,6 +1,6 @@
 import "server-only";
 
-export const EXPECTED_DATABASE_REVISION = "20260902_0014";
+export const EXPECTED_DATABASE_REVISION = "20260910_0016";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();

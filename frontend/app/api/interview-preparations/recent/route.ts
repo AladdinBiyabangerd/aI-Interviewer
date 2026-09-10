@@ -1,3 +1,4 @@
+import { publicInterviewGuard } from "../../../../lib/server/interview-access";
 import type { InterviewAnalysis } from "../../../../lib/interview-api";
 import { database } from "../../../../lib/server/database";
 import { json } from "../../../../lib/server/http";
@@ -8,6 +9,8 @@ export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const blocked = publicInterviewGuard();
+  if (blocked) return blocked;
   const session = sessionFor(request);
   const sql = database();
   const rows = await sql<{ analysis: InterviewAnalysis }[]>`

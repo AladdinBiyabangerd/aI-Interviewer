@@ -1,3 +1,4 @@
+import { publicInterviewGuard } from "../../../lib/server/interview-access";
 import type {
   InterviewAnalysis,
   PracticeDuration,
@@ -42,6 +43,8 @@ function parseInput(value: unknown): StartInput | null {
 }
 
 export async function POST(request: Request) {
+  const blocked = publicInterviewGuard();
+  if (blocked) return blocked;
   const session = sessionFor(request);
   let input: StartInput | null = null;
   try {
