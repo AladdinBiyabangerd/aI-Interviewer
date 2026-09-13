@@ -16,8 +16,8 @@ publish staged source wording.
 
 ## Historical interview implementation (not public in the MVP)
 
-This directory contains the standard Next.js 16 application deployed by Vercel. It
-supports English and Azerbaijani and implements the complete production text journey:
+This directory retains the former English and Azerbaijani interview implementation for
+reference, including:
 
 - company, role, job requirements, stage, and interview-language input;
 - optional direct upload to a private persistent Vercel Blob store;
@@ -27,9 +27,9 @@ supports English and Azerbaijani and implements the complete production text jou
 - answer-dependent adaptive follow-ups and feedback;
 - a final report generated from the candidate's saved answers.
 
-All application requests are same-origin. OpenAI, database, Blob, webhook, cron, and
-session secrets are read only in Node.js Route Handlers. There is no browser fallback
-that silently replaces failed production research with fabricated demo results.
+These flows are no longer routed as the public product. Their generation, upload,
+webhook and practice endpoints return HTTP 410. Do not provision OpenAI or Blob for the
+current assessment unless approved cleanup of historical artifacts still needs them.
 
 ## Local development
 
@@ -41,9 +41,7 @@ npm install
 npm run dev
 ```
 
-Vercel Blob upload-completion callbacks cannot call localhost. For end-to-end local CV
-testing, use a secure tunnel and set `VERCEL_BLOB_CALLBACK_URL` to its public origin, or
-test the deployed Preview environment. No-CV analysis works without that callback.
+Assessment development needs no Vercel Blob callback or model provider.
 
 ## Verification
 
