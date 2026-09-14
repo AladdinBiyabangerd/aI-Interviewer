@@ -68,7 +68,9 @@ export function startBookAssessment(id: string, bank: BankQuestion[]): Assessmen
 }
 
 export function withDeferredResults(state: AssessmentState): AssessmentState {
-  return { ...state, flowVersion: 2, turnIds: [state.currentId!], cursor: 0 };
+  if (state.flowVersion === 2 || !state.currentId) return state;
+  const turnIds = [...state.answers.map((answer) => answer.questionId), state.currentId];
+  return { ...state, flowVersion: 2, turnIds, cursor: turnIds.length - 1 };
 }
 
 export function grade(question: BankQuestion, selected: unknown): { selected: string[]; score: number } {

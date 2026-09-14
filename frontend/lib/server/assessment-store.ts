@@ -40,7 +40,7 @@ export async function assessmentRequest(request: Request, id?: string) {
         : await sql<{ state: AssessmentState }[]>`
         SELECT state FROM java_assessment_sessions WHERE owner_hash = ${session.ownerHash} AND expires_at > now() ORDER BY created_at DESC, id DESC LIMIT 1`;
       if (id && !rows.length) throw new AssessmentError("session_not_found", 404);
-      return json({ assessment: rows[0] ? assessmentView(rows[0].state) : null }, 200, session);
+      return json({ assessment: rows[0] ? assessmentView(withDeferredResults(rows[0].state)) : null }, 200, session);
     }
     const input = await body(request);
     if (!id) {
@@ -53,7 +53,7 @@ export async function assessmentRequest(request: Request, id?: string) {
         if (existing[0]) {
           const s = existing[0].state;
           if ((s.mode ?? "roadmap") !== setup.mode || s.level !== setup.level || s.company !== setup.company || JSON.stringify(s.topicIds) !== JSON.stringify(setup.topicIds)) throw new AssessmentError("request_id_reused", 409);
-          return s;
+          return withDeferredResults(s);
         }
         const recent = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM java_assessment_sessions WHERE owner_hash = ${session.ownerHash} AND created_at > now() - interval '10 minutes'`;
         if (recent[0].count >= 10) throw new AssessmentError("rate_limited", 429);
@@ -77,7 +77,7 @@ export async function assessmentRequest(request: Request, id?: string) {
       const rows = await tx<{ state: AssessmentState }[]>`
         SELECT state FROM java_assessment_sessions WHERE id = ${id} AND owner_hash = ${session.ownerHash} AND expires_at > now() FOR UPDATE`;
       if (!rows[0]) throw new AssessmentError("session_not_found", 404);
-      let next = rows[0].state;
+      let next = withDeferredResults(rows[0].state);
       if (input.action === "answer") {
         next = next.flowVersion === 2
           ? advanceQuestion(next, input.questionId, input.selected)

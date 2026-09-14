@@ -79,6 +79,30 @@ test("deferred assessment hides all grading until finish and supports skip, back
   assert.deepEqual(completed.history[0].correct, current(withDeferredResults(start("Junior", ["core-java", "spring"]))).correct);
 });
 
+test("saved assessments from the earlier flow regain previous-question navigation", () => {
+  let legacy = start("Junior", ["core-java", "spring"]);
+  const firstId = legacy.currentId;
+  const firstAnswer = current(legacy).correct;
+  legacy = answerQuestion(legacy, firstId, firstAnswer);
+  const upgraded = withDeferredResults(legacy);
+  assert.deepEqual(upgraded.turnIds, [firstId, legacy.currentId]);
+  assert.equal(upgraded.cursor, 1);
+  assert.equal(assessmentView(upgraded).canGoBack, true);
+  assert.deepEqual(assessmentView(upgraded).history, []);
+
+  const previous = goBack(upgraded);
+  assert.equal(previous.currentId, firstId);
+  assert.deepEqual(assessmentView(previous).selected, firstAnswer);
+  const wrong = current(previous).options.find((option) => !current(previous).correct.includes(option.id)).id;
+  const revised = advanceQuestion(previous, firstId, [wrong]);
+  assert.equal(current(revised).topic, "spring");
+  assert.equal(revised.answers.length, 1);
+  assert.equal(revised.answers[0].score, 0);
+  assert.equal(withDeferredResults(upgraded), upgraded);
+  const completedLegacy = { ...legacy, currentId: null };
+  assert.equal(withDeferredResults(completedLegacy), completedLegacy);
+});
+
 test("book flow can revisit a saved answer without losing later turns", () => {
   const bank = Array.from({ length: 15 }, (_, index) => ({ ...questionBank[0], id: `book-${index}`, collection: "book" }));
   let state = withDeferredResults(startBookAssessment("book-session", bank));
