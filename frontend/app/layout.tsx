@@ -4,9 +4,9 @@ import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
-const title = "Intervia — Java bilik testi";
+const title = "Intervia — Müsahibəyə hazır gir";
 const description =
-  "Intervia ilə Java biliklərinizi yoxlayın, sualları öz sürətinizlə cavablandırın və nəticələri testin sonunda görün.";
+  "Intervia ilə müsahibəyə hazırlaşın. İstiqamətinizi seçin, öz tempinizdə məşq edin və nəticələrinizi sonda nəzərdən keçirin.";
 
 const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
 const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;

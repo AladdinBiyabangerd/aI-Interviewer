@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Intervia — Java biliklərini inamla yoxla";
+export const alt = "Intervia — müsahibəyə hazır gir";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -12,11 +12,11 @@ export default function OpenGraphImage() {
         Intervia
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <div style={{ display: "flex", color: "#116b5b", fontSize: 21, fontWeight: 700, letterSpacing: 2 }}>JAVA BİLİK TESTİ</div>
-        <div style={{ display: "flex", maxWidth: 900, fontSize: 70, fontWeight: 700, lineHeight: 1.1, letterSpacing: -3 }}>Java biliklərini inamla yoxla.</div>
+        <div style={{ display: "flex", color: "#116b5b", fontSize: 21, fontWeight: 700, letterSpacing: 2 }}>MÜSAHİBƏYƏ HAZIRLIQ</div>
+        <div style={{ display: "flex", maxWidth: 900, fontSize: 70, fontWeight: 700, lineHeight: 1.1, letterSpacing: -3 }}>Növbəti müsahibəyə hazır gir.</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 23, borderTop: "2px solid #dce6df", color: "#52645e", fontSize: 20 }}>
-        <span>Adaptiv suallar · Kitab üzrə məşq · Aydın nəticələr</span>
+        <span>İstiqamət seç · Öz tempində məşq et · Nəticəni gör</span>
         <span>intervia</span>
       </div>
     </div>,

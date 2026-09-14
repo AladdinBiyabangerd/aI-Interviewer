@@ -1,7 +1,9 @@
 # Intervia web application
 
-**Current public MVP:** Intervia defaults to an Azerbaijani interface with an English
-switch. The general Java Q&A assessment has a reusable 45-question English seed,
+**Current public MVP:** Intervia has a field-neutral home page at `/` with an
+Azerbaijani interface and English switch. Java is the first available interview track
+at `/java`; future fields can be added as separate tracks. The general Java Q&A
+assessment has a reusable 45-question English seed,
 level/topic selection, adaptive difficulty, deferred scoring, Back/Skip navigation,
 cookie-based resume, learning references, ratings and editorial flags. A separate Java 8 book-practice mode
 samples 15 questions from 1,075 licensed, text-complete source questions; users can

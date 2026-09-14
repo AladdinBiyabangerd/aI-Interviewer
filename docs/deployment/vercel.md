@@ -1,7 +1,8 @@
-# Vercel deployment for the Java assessment
+# Vercel deployment for Intervia
 
-The public product is Intervia, an Azerbaijani-first Java Q&A assessment with an
-English interface option and a separate Java 8 book-practice mode. Vercel serves the Next.js UI
+Intervia has a field-neutral landing page at `/` and Java as its first available
+interview track at `/java`. The Azerbaijani-first interface has an English option;
+the Java track offers a general Q&A assessment and a separate Java 8 book-practice mode. Vercel serves the Next.js UI
 and same-origin Route Handlers from `frontend/`; PostgreSQL stores the versioned
 question bank, anonymous assessment sessions, answers and feedback. Assessment traffic
 does not use OpenAI or Vercel Blob. The retained interview-generation, CV-upload,

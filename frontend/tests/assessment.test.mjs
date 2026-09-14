@@ -205,8 +205,13 @@ test("book practice keeps licensed questions separate and advances through 15 sa
   assert.equal(report.history[0].question.source.title.includes("p. 21"), true);
 });
 test("public MVP exposes no old interview entry points or bank imports", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(page, /assessment-bank|interview-api|textarea|prepareInterview/);
+  const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const java = await readFile(new URL("../app/java/page.tsx", import.meta.url), "utf8");
+  assert.match(home, /href="\/java"/);
+  assert.match(home, /Yeni sahələr/);
+  assert.match(java, /href="\/"/);
+  assert.match(java, /\/api\/assessments/);
+  for (const page of [home, java]) assert.doesNotMatch(page, /assessment-bank|interview-api|textarea|prepareInterview/);
   const proxy = await readFile(new URL("../proxy.ts", import.meta.url), "utf8");
   for (const path of ["practice-sessions", "interview-preparations", "cv", "webhooks/openai"]) assert.ok(proxy.includes(path));
   assert.match(proxy, /status: 410/);
