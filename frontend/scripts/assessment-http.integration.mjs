@@ -55,25 +55,22 @@ try {
   const answer = { action: "answer", questionId: first.id, selected: first.correct };
   assert.equal((await owner(`/api/assessments/${id}`, answer, { origin: "https://attacker.example" })).status, 403);
   const retries = await Promise.all([owner(`/api/assessments/${id}`, answer), owner(`/api/assessments/${id}`, answer)]);
-  assert.ok(retries.every((r) => r.status === 200 && r.data.assessment.answered === 1 && r.data.assessment.earned === 10));
+  assert.ok(retries.every((r) => r.status === 200 && r.data.assessment.answered === 1 && r.data.assessment.earned === 0));
   view = retries[0].data.assessment;
   assert.equal((await owner(`/api/assessments/${id}`, { ...answer, selected: ["b"] })).status, 409);
   assert.equal((await owner(`/api/assessments/${id}`)).data.assessment.question.id, view.question.id);
   const second = questionBank.find((q) => q.id === view.question.id);
   assert.equal(second.type, "multiple");
   view = (await owner(`/api/assessments/${id}`, { action: "answer", questionId: second.id, selected: [second.correct[0]] })).data.assessment;
-  assert.equal(view.feedback.score, 5);
+  assert.equal(view.feedback, null);
+  assert.deepEqual(view.history, []);
   assert.equal(view.question.topic, "collections");
-  view = (await owner(`/api/assessments/${id}`, { action: "feedback", questionId: second.id, rating: 2, flag: "unclear" })).data.assessment;
-  assert.equal(view.feedback.rating, 2);
-  assert.equal(view.feedback.flag, "unclear");
-  await owner(`/api/assessments/${id}`, { action: "feedback", questionId: second.id, rating: 4 });
-  const [counts] = await sql`SELECT count(*)::int AS total, max(rating) AS rating FROM java_question_feedback WHERE question_id = ${second.id}`;
-  assert.equal(counts.total, 1); assert.equal(counts.rating, 4);
-  assert.match(cli("review"), /unclear/);
-  cli("resolve", second.id, "1");
-  const [resolved] = await sql`SELECT review_status FROM java_question_feedback WHERE question_id = ${second.id}`;
-  assert.equal(resolved.review_status, "resolved");
+  assert.equal((await owner(`/api/assessments/${id}`, { action: "feedback", questionId: second.id, rating: 2, flag: "unclear" })).status, 409);
+  const beforeReview = await owner(`/api/assessments/${id}`, { action: "back" });
+  assert.equal(beforeReview.data.assessment.question.id, second.id);
+  view = (await owner(`/api/assessments/${id}`, { action: "answer", questionId: second.id, selected: [second.correct[0]] })).data.assessment;
+  assert.equal(view.question.topic, "collections");
+  assert.equal((await owner(`/api/assessments/${id}`)).data.assessment.question.id, view.question.id);
   // A question retirement changes new sessions, while the current snapshot stays valid.
   const snapshotId = view.question.id;
   cli("retire", snapshotId, "1");
@@ -82,15 +79,28 @@ try {
   assert.notEqual(fresh.question.id, snapshotId);
   cli("publish", snapshotId, "1");
   let guard = 20;
-  while (view.question && guard-- > 0) {
+  while (view.question && !view.readyToFinish && guard-- > 0) {
     const q = questionBank.find((q) => q.id === view.question.id);
     const result = await owner(`/api/assessments/${id}`, { action: "answer", questionId: q.id, selected: q.correct });
     assert.equal(result.status, 200);
     view = result.data.assessment;
   }
+  assert.equal(view.status, "active");
+  assert.equal(view.history.length, 0);
+  view = (await owner(`/api/assessments/${id}`, { action: "finish" })).data.assessment;
   assert.equal(view.status, "completed");
   assert.equal(view.answered, 14); assert.equal(view.earned, 135); assert.equal(view.possible, 140);
   assert.equal(view.percent, 96);
+  view = (await owner(`/api/assessments/${id}`, { action: "feedback", questionId: second.id, rating: 2, flag: "unclear" })).data.assessment;
+  assert.equal(view.history[1].rating, 2);
+  await owner(`/api/assessments/${id}`, { action: "feedback", questionId: second.id, rating: 4 });
+  const [counts] = await sql`SELECT count(*)::int AS total, max(rating) AS rating FROM java_question_feedback WHERE question_id = ${second.id}`;
+  assert.equal(counts.total, 1); assert.equal(counts.rating, 4);
+  assert.match(cli("review"), /unclear/);
+  cli("resolve", second.id, "1");
+  const [resolved] = await sql`SELECT review_status FROM java_question_feedback WHERE question_id = ${second.id}`;
+  assert.equal(resolved.review_status, "resolved");
+  view = (await owner(`/api/assessments/${id}`)).data.assessment;
   assert.equal(view.history[1].rating, 4);
   assert.deepEqual((await owner(`/api/assessments/${id}`)).data.assessment, view);
   const early = (await owner("/api/assessments", setup())).data.assessment;

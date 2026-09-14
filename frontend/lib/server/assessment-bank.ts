@@ -4,6 +4,7 @@ import type { CompanyContext, Level, PublicQuestion, Reference } from "../assess
 export type BankQuestion = PublicQuestion & {
   level: Level; correct: string[]; explanation: string; references: Reference[];
   status: "published" | "draft" | "retired";
+  collection?: "book";
 };
 const refs = {
   java: { title: "Oracle: Java language basics", url: "https://dev.java/learn/language-basics/" },

@@ -3,7 +3,8 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { questionBank } from "../lib/server/assessment-bank.ts";
 import { validateBank } from "../lib/server/assessment-bank-validation.ts";
-import { answerQuestion, assessmentView, grade, parseSetup, startAssessment } from "../lib/server/assessment-engine.ts";
+import { advanceQuestion, answerQuestion, assessmentView, goBack, grade, parseSetup, startAssessment, startBookAssessment, withDeferredResults } from "../lib/server/assessment-engine.ts";
+import { bookQuestion } from "../lib/server/book-questions.ts";
 import { defaultTopics, levels, topics } from "../lib/assessment.ts";
 
 function start(level = "Junior", topicIds = defaultTopics[level], bank = questionBank, company = null) {
@@ -39,6 +40,60 @@ test("unanswered keys and explanations are never exposed in the session response
   assert.equal(view.question.references, undefined);
   assert.equal(view.questions, undefined);
   assert.equal(view.percent, null);
+});
+test("deferred assessment hides all grading until finish and supports skip, back, and edits", () => {
+  let state = withDeferredResults(start("Junior", ["core-java", "spring"]));
+  const firstId = state.currentId;
+  state = advanceQuestion(state, firstId, null);
+  assert.equal(advanceQuestion(state, firstId, null), state);
+  let view = assessmentView(state);
+  assert.equal(view.skipped, 1);
+  assert.equal(view.answered, 0);
+  assert.deepEqual(view.history, []);
+  assert.deepEqual(view.results, []);
+  assert.equal(view.feedback, null);
+  assert.equal(view.percent, null);
+  assert.equal(view.earned, 0);
+  assert.equal(view.question.correct, undefined);
+  assert.equal(state.currentId, start("Junior", ["spring"]).currentId);
+
+  state = goBack(state);
+  view = assessmentView(state);
+  assert.equal(view.currentIndex, 1);
+  assert.equal(view.canGoBack, false);
+  assert.deepEqual(view.selected, []);
+  state = advanceQuestion(state, firstId, current(state).correct);
+  assert.equal(state.answers.length, 1);
+  assert.equal(state.answers[0].score, 10);
+  assert.equal(current(state).complexity, 2);
+  assert.equal(assessmentView(state).history.length, 0);
+  const secondId = state.currentId;
+  state = advanceQuestion(state, secondId, null);
+  assert.equal(assessmentView(state).skipped, 1);
+  const completed = assessmentView({ ...state, currentId: null, finishedEarly: true });
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.possible, 10);
+  assert.equal(completed.earned, 10);
+  assert.equal(completed.history.length, 2);
+  assert.equal(completed.history[1].skipped, true);
+  assert.deepEqual(completed.history[0].correct, current(withDeferredResults(start("Junior", ["core-java", "spring"]))).correct);
+});
+
+test("book flow can revisit a saved answer without losing later turns", () => {
+  const bank = Array.from({ length: 15 }, (_, index) => ({ ...questionBank[0], id: `book-${index}`, collection: "book" }));
+  let state = withDeferredResults(startBookAssessment("book-session", bank));
+  state = advanceQuestion(state, state.currentId, [bank[0].correct[0]]);
+  state = advanceQuestion(state, state.currentId, null);
+  state = goBack(state);
+  state = goBack(state);
+  assert.deepEqual(assessmentView(state).selected, [bank[0].correct[0]]);
+  const wrong = bank[0].options.find((option) => !bank[0].correct.includes(option.id)).id;
+  state = advanceQuestion(state, state.currentId, [wrong]);
+  assert.equal(state.currentId, bank[1].id);
+  state = advanceQuestion(state, state.currentId, null);
+  assert.equal(state.currentId, bank[2].id);
+  assert.equal(assessmentView(state).completedCount, 2);
+  assert.equal(assessmentView(state).history.length, 0);
 });
 test("choice grading gives partial credit, penalizes wrong selections and rejects malformed answers", () => {
   const q = questionBank.find((q) => q.type === "multiple");
@@ -118,6 +173,36 @@ test("verified company variants are capped at 20% at every step and cannot open 
 });
 test("retired questions are excluded, and unavailable topics fail honestly", () => {
   assert.throws(() => start("Junior", ["spring"], questionBank.map((q) => ({ ...q, status: "retired" }))), /topic_unavailable/);
+});
+
+test("book practice keeps licensed questions separate and advances through 15 sampled turns", () => {
+  const candidate = {
+    chapter_number: 1, chapter_title: "Java Basics", question_number: 1, page_start: 21,
+    prompt: "Choose an entry point.\npublic static void main(String[] args)",
+    options: [{ id: "A", text: "valid" }, { id: "B", text: "invalid" }, { id: "C", text: "other" }],
+    correct: ["A"], explanation: "The method is public and static.",
+  };
+  const sample = Array.from({ length: 15 }, (_, index) => bookQuestion({ ...candidate, question_number: index + 1 }, "https://example.com/book"));
+  validateBank(sample);
+  assert.equal(parseSetup({ mode: "book" }).mode, "book");
+  assert.throws(() => startBookAssessment("id", sample.slice(1)), /book_unavailable/);
+  assert.equal(start("Junior", defaultTopics.Junior, [...questionBank, ...sample]).questions.some((question) => question.collection === "book"), false);
+  let state = startBookAssessment("id", sample);
+  for (let turn = 0; turn < 15; turn++) {
+    const view = assessmentView(state);
+    assert.equal(view.mode, "book");
+    assert.equal(view.maximumQuestions, 15);
+    assert.equal(view.answered, turn);
+    assert.equal(view.question.correct, undefined);
+    assert.equal(view.question.explanation, undefined);
+    state = answerQuestion(state, state.currentId, [turn % 2 ? "A" : "B"]);
+  }
+  const report = assessmentView(state);
+  assert.equal(report.status, "completed");
+  assert.equal(report.answered, 15);
+  assert.equal(report.completedTopics, 15);
+  assert.equal(report.history.length, 15);
+  assert.equal(report.history[0].question.source.title.includes("p. 21"), true);
 });
 test("public MVP exposes no old interview entry points or bank imports", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");

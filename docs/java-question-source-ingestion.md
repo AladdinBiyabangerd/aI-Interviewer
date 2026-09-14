@@ -88,9 +88,20 @@ npm run bank -- source-rights <batch-uuid> cleared
 npm run bank -- source-rights <batch-uuid> rejected
 ```
 
-There is deliberately no bulk command from staging to `java_question_bank`. Publication
-continues through the existing versioned draft, review and explicit publish workflow.
-This prevents a parser result or unverified copyrighted source from becoming live content.
+The licensed OCA/OCP Java SE 8 batch has a dedicated operator command after its rights
+decision is recorded:
+
+```powershell
+npm run bank -- publish-book <batch-uuid>
+```
+
+This command requires `rights_status=cleared`, validates the mapped question bank, and
+publishes `parse_status=complete` candidates as versioned book questions, excluding
+chapter 8 question 3 because its diagram arrows are lost during text extraction. It is
+idempotent and preserves retired revisions. Items marked `needs_review` stay private.
+The public assessment offers a separate, clearly labeled 15-question book practice
+sample. The extracted material has not received line-by-line human editorial review;
+users can flag extraction or answer-key issues after answering.
 
 ## Verified extraction baseline
 

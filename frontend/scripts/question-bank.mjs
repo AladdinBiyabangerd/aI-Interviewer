@@ -3,11 +3,12 @@ import { readFile, stat } from "node:fs/promises";
 import postgres from "postgres";
 import { questionBank } from "../lib/server/assessment-bank.ts";
 import { validateBank } from "../lib/server/assessment-bank-validation.ts";
+import { bookQuestion } from "../lib/server/book-questions.ts";
 
 const [command, argument, versionText] = process.argv.slice(2);
-const commands = ["validate", "seed", "import", "list", "review", "publish", "retire", "resolve", "stage", "staged", "source-rights"];
+const commands = ["validate", "seed", "import", "list", "review", "publish", "retire", "resolve", "stage", "staged", "source-rights", "publish-book"];
 if (!commands.includes(command)) {
-  console.error("Usage: npm run bank -- validate|seed|import <file.json>|list|review|publish <id> <version>|retire <id> <version>|resolve <id> <version>|stage <extraction.json>|staged|source-rights <batch-id> <cleared|rejected>");
+  console.error("Usage: npm run bank -- validate|seed|import <file.json>|list|review|publish <id> <version>|retire <id> <version>|resolve <id> <version>|stage <extraction.json>|staged|source-rights <batch-id> <cleared|rejected>|publish-book <batch-id>");
   process.exit(1);
 }
 let sql;
@@ -73,13 +74,26 @@ try {
         const rows = await tx`INSERT INTO java_question_import_batches (source_sha256, file_name, source_title, authors, publisher, publication_year, reference_url, parser_release, rights_status, status, page_count, question_count, answer_count, report)
           VALUES (${source.sha256}, ${source.file_name}, ${source.title}, ${source.authors ?? null}, ${source.publisher ?? null}, ${source.publication_year ?? null}, ${source.reference_url ?? null}, ${document.parser_release}, 'unverified', ${document.status}, ${source.page_count}, ${document.question_count}, ${document.answer_count}, ${tx.json(report)}) RETURNING id`;
         const id = rows[0].id;
-        // Pipeline bounded chunks on the transaction's reserved connection. This keeps
-        // large books fast on a remote database without building one oversized query.
+        // Insert bounded chunks as one statement per chunk. Issuing one query per
+        // candidate is prohibitively slow when the database is remote.
         for (let offset = 0; offset < document.candidates.length; offset += 100) {
-          await Promise.all(document.candidates.slice(offset, offset + 100).map((q) =>
-            tx`INSERT INTO java_question_import_candidates (batch_id, source_question_key, chapter_number, chapter_title, question_number, page_start, page_end, prompt, options, correct, explanation, normalized_hash, parse_status, issue_codes)
-              VALUES (${id}, ${q.source_question_key}, ${q.chapter_number}, ${q.chapter_title}, ${q.question_number}, ${q.page_start}, ${q.page_end}, ${q.prompt}, ${tx.json(q.options)}, ${q.correct === null ? null : tx.json(q.correct)}, ${q.explanation}, ${q.normalized_hash}, ${q.parse_status}, ${tx.json(q.issue_codes)})`,
-          ));
+          const candidates = document.candidates.slice(offset, offset + 100).map((q) => ({
+            batch_id: id,
+            source_question_key: q.source_question_key,
+            chapter_number: q.chapter_number,
+            chapter_title: q.chapter_title,
+            question_number: q.question_number,
+            page_start: q.page_start,
+            page_end: q.page_end,
+            prompt: q.prompt,
+            options: tx.json(q.options),
+            correct: q.correct === null ? null : tx.json(q.correct),
+            explanation: q.explanation,
+            normalized_hash: q.normalized_hash,
+            parse_status: q.parse_status,
+            issue_codes: tx.json(q.issue_codes),
+          }));
+          await tx`INSERT INTO java_question_import_candidates ${tx(candidates)}`;
         }
         return id;
       });
@@ -92,6 +106,37 @@ try {
       const rows = await sql`UPDATE java_question_import_batches SET rights_status = ${versionText} WHERE id = ${argument} RETURNING id`;
       if (!rows.length) throw new Error("Import batch not found");
       console.log(`source-rights: ${argument} ${versionText}`);
+    } else if (command === "publish-book") {
+      if (!/^[0-9a-f-]{36}$/i.test(argument ?? "")) throw new Error("An exact batch UUID is required");
+      const batches = await sql`SELECT source_title, reference_url, rights_status FROM java_question_import_batches WHERE id = ${argument}`;
+      if (batches.length !== 1 || batches[0].rights_status !== "cleared"
+        || batches[0].source_title !== "OCA/OCP Java SE 8 Programmer Practice Tests"
+        || !batches[0].reference_url) throw new Error("The expected book batch must have cleared usage rights and a reference URL");
+      const candidates = await sql`SELECT source_question_key, chapter_number, chapter_title, question_number, page_start, prompt, options, correct, explanation
+        FROM java_question_import_candidates WHERE batch_id = ${argument} AND parse_status = 'complete'
+        ORDER BY chapter_number, question_number`;
+      // The parser missed the visual dependency in this hierarchy-diagram item.
+      // Text extraction removes arrows, so the options cannot be shown faithfully.
+      const questions = candidates.filter((candidate) => candidate.source_question_key !== "chapter-8-question-3")
+        .map((candidate) => bookQuestion(candidate, batches[0].reference_url));
+      validateBank(questions);
+      await sql.begin(async (tx) => {
+        for (let offset = 0; offset < questions.length; offset += 100) {
+          const rows = questions.slice(offset, offset + 100).map((q) => {
+            const content = { ...q };
+            delete content.status;
+            return { id: q.id, version: q.version, status: "published", content_hash: createHash("sha256").update(JSON.stringify(content)).digest("hex"), question: tx.json(q) };
+          });
+          await tx`INSERT INTO java_question_bank ${tx(rows)} ON CONFLICT (id, version) DO NOTHING`;
+          const stored = await tx`SELECT id, content_hash FROM java_question_bank WHERE id IN ${tx(rows.map((row) => row.id))} AND version = 1`;
+          for (const row of rows) {
+            if (stored.find((item) => item.id === row.id)?.content_hash !== row.content_hash) {
+              throw new Error(`Book question changed without a version bump: ${row.id}`);
+            }
+          }
+        }
+      });
+      console.log(`Published ${questions.length} parser-complete book questions; visual-review items remain private.`);
     } else if (command === "seed" || command === "import") {
       await sql.begin(async (tx) => {
         for (const q of bank) {

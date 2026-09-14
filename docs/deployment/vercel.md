@@ -1,6 +1,7 @@
 # Vercel deployment for the Java assessment
 
-The public product is the English Java Q&A assessment. Vercel serves the Next.js UI
+The public product is Intervia, an Azerbaijani-first Java Q&A assessment with an
+English interface option and a separate Java 8 book-practice mode. Vercel serves the Next.js UI
 and same-origin Route Handlers from `frontend/`; PostgreSQL stores the versioned
 question bank, anonymous assessment sessions, answers and feedback. Assessment traffic
 does not use OpenAI or Vercel Blob. The retained interview-generation, CV-upload,
@@ -118,8 +119,9 @@ uv run ai-interviewer-migrate check-artifact
 
 After the migration and reviewed question publication, require
 `GET /api/health` to return HTTP 200 with `{"status":"ready"}`. Then verify the
-homepage, an assessment at each level, single- and multiple-choice scoring, early
-completion, study references, rating/flag submission and retention authorization.
+homepage, an assessment at each level, book practice, Back/Skip navigation, refresh
+restoration, scoring released only after completion, early completion, study references,
+rating/flag submission and retention authorization.
 Confirm that browser bundles and network responses contain no database URL, signing
 secret, cron secret or answer key for unanswered questions.
 

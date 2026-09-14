@@ -1,8 +1,11 @@
-# Interview Prep web application
+# Intervia web application
 
-**Current public MVP:** general Java Q&A assessment in English, with a reusable
-45-question seed, level/topic selection, adaptive difficulty, deterministic scores,
-learning references, ratings and editorial flags. See the
+**Current public MVP:** Intervia defaults to an Azerbaijani interface with an English
+switch. The general Java Q&A assessment has a reusable 45-question English seed,
+level/topic selection, adaptive difficulty, deferred scoring, Back/Skip navigation,
+cookie-based resume, learning references, ratings and editorial flags. A separate Java 8 book-practice mode
+samples 15 questions from 1,075 licensed, text-complete source questions; users can
+flag extraction or answer-key issues. See the
 [setup and editorial guide](../docs/java-assessment-mvp.md). It requires PostgreSQL at
 `20260910_0016`, a signed session secret and the retention cron secret. Seed imports
 enter draft; publish the exact revisions after review. OpenAI and Blob are not needed

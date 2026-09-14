@@ -1,7 +1,8 @@
 # Java Q&A assessment MVP
 
-The public Next.js app now starts with a general Java knowledge assessment. Company,
-job description and CV are not required. The former interview UI lives in
+The public Next.js app now starts with a general Java knowledge assessment and offers
+an optional Java 8 book-practice question set. Company, job description and CV are not
+required. The former interview UI lives in
 `frontend/legacy/page.tsx` outside the routing tree; its generation, upload, webhook
 and open-ended practice endpoints return HTTP 410 through `frontend/proxy.ts` and
 the server handler guard, including requests that do not match the proxy.
@@ -22,10 +23,19 @@ assess every roadmap competency or certify employment seniority.
 version, level, topic, tags, integer complexity from 0–10, choice type, answer key,
 short conceptual explanation and official learning reference. The seed avoids code
 recitation and specialized banking compliance. It contains no copied interview bank
-and no claims that a company asked a question. UI and question content are English
-for this MVP; the former bilingual interview implementation is retained separately.
+and no claims that a company asked a question. The Intervia interface defaults to
+Azerbaijani and offers English as a switch. General and book question text, options
+and explanations remain in their original English; the UI states this for book practice.
 
-The seed is AI-authored original content with structural and scoring checks. This
+The licensed OCA/OCP Java SE 8 practice book contributes 1,075 usable
+questions to a separate book collection in `java_question_bank`. A book attempt samples
+15 questions without adapting difficulty. Nineteen visually ambiguous extraction items
+remain private in `java_question_import_candidates`; one additional diagram item was
+retired after visual review. Book questions preserve the source
+chapter and page attribution and are labeled as automatically extracted, since they
+have not received line-by-line human editorial review.
+
+The original 45-question seed is AI-authored content with structural and scoring checks. This
 is **not evidence of independent human editorial approval**. Imports enter draft so
 the team can review the actual questions, answer keys and references before making
 them available. A source link means the listed learning reference supports the idea;
@@ -43,13 +53,17 @@ it does not mean the original question was copied from that page.
   `10 × max(0, correct_selected / correct_total − incorrect_selected / incorrect_total)`,
   rounded to one decimal place. Choosing every option earns 0; scores never go negative.
 - An answer must contain unique, valid option IDs. The browser never sends a trusted
-  score. Unanswered keys, explanations and the rest of the bank stay on the server.
+  score. A student may also skip a question. New sessions permit Back and Next;
+  changing an earlier general answer recalculates the following adaptive path.
+  Scores, answer keys, explanations and history stay hidden until explicit completion.
+  The signed HttpOnly session cookie restores the latest attempt after refresh, while
+  an unsent choice is retained in browser local storage.
 - The final percentage is earned points divided by `10 × submitted answers`.
   Skipped or unvisited questions do not contribute fabricated zeroes. Early completion
   identifies unassessed topics. Results show the target scope, observed difficulty,
   strengths in the sample, weaker topics, answer history and relevant study links.
 - Different adaptive attempts are not directly comparable for ranking. Leaderboards,
-  calibrated level placement, books, gamification and open-ended responses remain future work.
+  calibrated level placement, gamification and open-ended responses remain future work.
 
 Company names optionally select matching sourced question contexts, with a maximum
 of 20% of delivered questions and no company question at the start of a topic.
@@ -153,12 +167,13 @@ non-test database names. It imports and publishes test fixtures, exercises real 
 requests, then checks persisted feedback and editorial operations. It is not a
 production smoke test.
 
-Implementation verification on September 10, 2026: all 24 frontend tests, ESLint,
+Implementation verification on September 14, 2026: all 27 frontend tests, ESLint,
 TypeScript and the optimized Next.js build passed. The real PostgreSQL migration
 roundtrip/model-parity test passed; all 10 release-migration tests passed after
 updating the release-image revision pin. The local HTTP integration script passed,
 including duplicate concurrent submissions and editorial feedback persistence.
-Additional HTTP checks confirmed rendered homepage markup, encoded legacy route
-restrictions and authorized retention cleanup. No live provider request or deployment
-was made. Browser automation exposed no browser surface, so visual/responsive browser
-QA remains unverified. Full unrelated Python product-suite coverage was not rerun.
+Additional live HTTP smoke checks confirmed cookie restoration, Back/Skip navigation,
+adaptive recalculation, answer redaction during an attempt and final reveal. These
+checks removed only their exact diagnostic session rows. No live provider request or
+deployment was made. Browser automation exposed no browser surface, so visual/responsive
+browser QA remains unverified. Full unrelated Python product-suite coverage was not rerun.

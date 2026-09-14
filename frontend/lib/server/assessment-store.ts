@@ -1,6 +1,6 @@
 import "server-only";
 import type { BankQuestion } from "./assessment-bank";
-import { answerQuestion, AssessmentError, assessmentView, parseSetup, startAssessment, type AssessmentState } from "./assessment-engine";
+import { advanceQuestion, answerQuestion, AssessmentError, assessmentView, goBack, parseSetup, startAssessment, startBookAssessment, withDeferredResults, type AssessmentState } from "./assessment-engine";
 import { retentionDays } from "./config";
 import { database } from "./database";
 import { json } from "./http";
@@ -52,16 +52,21 @@ export async function assessmentRequest(request: Request, id?: string) {
         const existing = await tx<{ state: AssessmentState }[]>`SELECT state FROM java_assessment_sessions WHERE id = ${newId} AND owner_hash = ${session.ownerHash} AND expires_at > now()`;
         if (existing[0]) {
           const s = existing[0].state;
-          if (s.level !== setup.level || s.company !== setup.company || JSON.stringify(s.topicIds) !== JSON.stringify(setup.topicIds)) throw new AssessmentError("request_id_reused", 409);
+          if ((s.mode ?? "roadmap") !== setup.mode || s.level !== setup.level || s.company !== setup.company || JSON.stringify(s.topicIds) !== JSON.stringify(setup.topicIds)) throw new AssessmentError("request_id_reused", 409);
           return s;
         }
         const recent = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM java_assessment_sessions WHERE owner_hash = ${session.ownerHash} AND created_at > now() - interval '10 minutes'`;
         if (recent[0].count >= 10) throw new AssessmentError("rate_limited", 429);
-        const rows = await tx<{ question: BankQuestion; status: BankQuestion["status"] }[]>`
-          SELECT question, status FROM (
-            SELECT DISTINCT ON (id) question, status FROM java_question_bank WHERE status <> 'draft' ORDER BY id, version DESC
-          ) latest WHERE status = 'published'`;
-        const next = startAssessment(newId, setup, rows.map((r) => ({ ...r.question, status: r.status })));
+        const rows = setup.mode === "book"
+          ? await tx<{ question: BankQuestion; status: BankQuestion["status"] }[]>`
+            SELECT question, status FROM java_question_bank WHERE status = 'published'
+              AND question->>'collection' = 'book' ORDER BY random() LIMIT 15`
+          : await tx<{ question: BankQuestion; status: BankQuestion["status"] }[]>`
+            SELECT question, status FROM (
+              SELECT DISTINCT ON (id) question, status FROM java_question_bank WHERE status <> 'draft' ORDER BY id, version DESC
+            ) latest WHERE status = 'published' AND question->>'collection' IS DISTINCT FROM 'book'`;
+        const bank = rows.map((r) => ({ ...r.question, status: r.status }));
+        const next = withDeferredResults(setup.mode === "book" ? startBookAssessment(newId, bank) : startAssessment(newId, setup, bank));
         await tx`INSERT INTO java_assessment_sessions (id, owner_hash, state, expires_at)
           VALUES (${newId}, ${session.ownerHash}, ${tx.json(next)}, now() + (${retentionDays()} * interval '1 day'))`;
         return next;
@@ -74,11 +79,19 @@ export async function assessmentRequest(request: Request, id?: string) {
       if (!rows[0]) throw new AssessmentError("session_not_found", 404);
       let next = rows[0].state;
       if (input.action === "answer") {
-        next = answerQuestion(next, input.questionId, input.selected);
+        next = next.flowVersion === 2
+          ? advanceQuestion(next, input.questionId, input.selected)
+          : answerQuestion(next, input.questionId, input.selected);
+      } else if (input.action === "back") {
+        next = goBack(next);
       } else if (input.action === "finish") {
         if (!next.answers.length) throw new AssessmentError("answer_required");
-        next = { ...next, finishedEarly: next.finishedEarly || Boolean(next.currentId), currentId: null };
+        const finalTurn = next.flowVersion === 2 && next.currentId && next.turnIds
+          && next.cursor === next.turnIds.length - 1
+          && next.answers.some((answer) => answer.questionId === next.currentId);
+        next = { ...next, finishedEarly: next.finishedEarly || (Boolean(next.currentId) && !finalTurn), currentId: null };
       } else if (input.action === "feedback") {
+        if (next.flowVersion === 2 && next.currentId) throw new AssessmentError("assessment_not_complete", 409);
         const answer = next.answers.find((a) => a.questionId === input.questionId);
         const question = next.questions.find((q) => q.id === input.questionId);
         if (!answer || !question) throw new AssessmentError("answer_required");

@@ -34,7 +34,7 @@ export type PublicQuestion = {
   source: Reference; companyContexts: CompanyContext[];
 };
 export type AnswerFeedback = {
-  question: PublicQuestion; selected: string[]; correct: string[]; score: number;
+  question: PublicQuestion; selected: string[]; correct: string[]; score: number | null; skipped: boolean;
   explanation: string; references: Reference[];
   rating: number | null; flag: string | null;
 };
@@ -44,9 +44,11 @@ export type TopicResult = {
   references: Reference[];
 };
 export type AssessmentView = {
-  id: string; level: Level; company: string | null; companyNotice: string | null;
+  id: string; mode: "roadmap" | "book"; level: Level; company: string | null; companyNotice: string | null;
   status: "active" | "completed"; question: PublicQuestion | null;
   answered: number; maximumQuestions: number; completedTopics: number; totalTopics: number;
+  skipped: number; completedCount: number; currentIndex: number; selected: string[];
+  canGoBack: boolean; readyToFinish: boolean;
   earned: number; possible: number; percent: number | null;
   feedback: AnswerFeedback | null; history: AnswerFeedback[]; results: TopicResult[];
   summary: string; finishedEarly: boolean;

@@ -24,7 +24,7 @@ export async function GET() {
     }
     const bank = await database()<{ question: BankQuestion }[]>`SELECT question FROM (
       SELECT DISTINCT ON (id) question, status FROM java_question_bank WHERE status <> 'draft' ORDER BY id, version DESC
-    ) latest WHERE status = 'published'`;
+    ) latest WHERE status = 'published' AND question->>'collection' IS DISTINCT FROM 'book'`;
     try {
       for (const level of levels) startAssessment("readiness", { level, topicIds: defaultTopics[level], company: null }, bank.map((r) => ({ ...r.question, status: "published" })));
     } catch { return json({ status: "not_ready", code: "question_bank_incomplete" }, 503); }
