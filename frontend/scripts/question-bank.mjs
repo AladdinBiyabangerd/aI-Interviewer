@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import postgres from "postgres";
 import { questionBank } from "../lib/server/assessment-bank.ts";
 import { validateBank } from "../lib/server/assessment-bank-validation.ts";
-import { bookQuestion } from "../lib/server/book-questions.ts";
+import { bookQuestion, hasConsistentBookAnswer } from "../lib/server/book-questions.ts";
 
 const [command, argument, versionText] = process.argv.slice(2);
 const commands = ["validate", "seed", "import", "list", "review", "publish", "retire", "resolve", "stage", "staged", "source-rights", "publish-book"];
@@ -118,7 +118,8 @@ try {
       // The parser missed the visual dependency in this hierarchy-diagram item.
       // Text extraction removes arrows, so the options cannot be shown faithfully.
       const questions = candidates.filter((candidate) => candidate.source_question_key !== "chapter-8-question-3")
-        .map((candidate) => bookQuestion(candidate, batches[0].reference_url));
+        .map((candidate) => bookQuestion(candidate, batches[0].reference_url))
+        .filter(hasConsistentBookAnswer);
       validateBank(questions);
       await sql.begin(async (tx) => {
         for (let offset = 0; offset < questions.length; offset += 100) {

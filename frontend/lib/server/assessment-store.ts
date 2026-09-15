@@ -1,6 +1,7 @@
 import "server-only";
 import type { BankQuestion } from "./assessment-bank";
 import { advanceQuestion, answerQuestion, AssessmentError, assessmentView, goBack, parseSetup, startAssessment, startBookAssessment, withDeferredResults, type AssessmentState } from "./assessment-engine";
+import { hasConsistentBookAnswer } from "./book-questions";
 import { retentionDays } from "./config";
 import { database } from "./database";
 import { json } from "./http";
@@ -60,13 +61,14 @@ export async function assessmentRequest(request: Request, id?: string) {
         const rows = setup.mode === "book"
           ? await tx<{ question: BankQuestion; status: BankQuestion["status"] }[]>`
             SELECT question, status FROM java_question_bank WHERE status = 'published'
-              AND question->>'collection' = 'book' ORDER BY random() LIMIT 15`
+              AND question->>'collection' = 'book' ORDER BY random() LIMIT 60`
           : await tx<{ question: BankQuestion; status: BankQuestion["status"] }[]>`
             SELECT question, status FROM (
               SELECT DISTINCT ON (id) question, status FROM java_question_bank WHERE status <> 'draft' ORDER BY id, version DESC
             ) latest WHERE status = 'published' AND question->>'collection' IS DISTINCT FROM 'book'`;
         const bank = rows.map((r) => ({ ...r.question, status: r.status }));
-        const next = withDeferredResults(setup.mode === "book" ? startBookAssessment(newId, bank) : startAssessment(newId, setup, bank));
+        const eligibleBank = setup.mode === "book" ? bank.filter(hasConsistentBookAnswer).slice(0, 15) : bank;
+        const next = withDeferredResults(setup.mode === "book" ? startBookAssessment(newId, eligibleBank) : startAssessment(newId, setup, eligibleBank));
         await tx`INSERT INTO java_assessment_sessions (id, owner_hash, state, expires_at)
           VALUES (${newId}, ${session.ownerHash}, ${tx.json(next)}, now() + (${retentionDays()} * interval '1 day'))`;
         return next;

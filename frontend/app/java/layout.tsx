@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-const title = "Java müsahibəsinə hazırlıq — Intervia";
+const title = "Java müsahibəsinə hazırlıq — AI Interviewer";
 const description = "Java və backend biliklərinizi yoxlayın, Java 8 kitabı üzrə məşq edin və cavablarınızı testin sonunda nəzərdən keçirin.";
 
 export const metadata: Metadata = {

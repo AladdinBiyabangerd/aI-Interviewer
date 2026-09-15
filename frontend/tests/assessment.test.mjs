@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { questionBank } from "../lib/server/assessment-bank.ts";
 import { validateBank } from "../lib/server/assessment-bank-validation.ts";
 import { advanceQuestion, answerQuestion, assessmentView, goBack, grade, parseSetup, startAssessment, startBookAssessment, withDeferredResults } from "../lib/server/assessment-engine.ts";
-import { bookQuestion } from "../lib/server/book-questions.ts";
+import { bookQuestion, hasConsistentBookAnswer } from "../lib/server/book-questions.ts";
 import { defaultTopics, levels, topics } from "../lib/assessment.ts";
 
 function start(level = "Junior", topicIds = defaultTopics[level], bank = questionBank, company = null) {
@@ -128,6 +128,17 @@ test("choice grading gives partial credit, penalizes wrong selections and reject
   assert.equal(grade(q, q.options.map((o) => o.id)).score, 0);
   for (const selection of [[], ["unknown"], [q.correct[0], q.correct[0]], "a", null]) assert.throws(() => grade(q, selection));
   assert.throws(() => grade(questionBank[0], ["a", "b"]));
+});
+test("an exact answer always earns ten points regardless of selection order", () => {
+  for (const question of questionBank) {
+    assert.equal(grade(question, [...question.correct].reverse()).score, 10, question.id);
+  }
+});
+test("book questions with an explicit answer-key contradiction are excluded", () => {
+  const question = { ...questionBank[0], collection: "book", correct: ["a"] };
+  assert.equal(hasConsistentBookAnswer({ ...question, explanation: "Option A is correct." }), true);
+  assert.equal(hasConsistentBookAnswer({ ...question, explanation: "Option A is incorrect." }), true);
+  assert.equal(hasConsistentBookAnswer({ ...question, explanation: "Option B is the correct answer." }), false);
 });
 test("every topic starts simple, increases on success and ends after a miss", () => {
   let state = start("Junior", ["core-java", "spring"]);

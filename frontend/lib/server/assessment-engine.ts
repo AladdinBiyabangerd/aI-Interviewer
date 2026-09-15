@@ -82,7 +82,8 @@ export function grade(question: BankQuestion, selected: unknown): { selected: st
   const hits = selected.filter((id) => question.correct.includes(id)).length;
   const wrong = selected.length - hits;
   const distractors = question.options.length - question.correct.length;
-  const score = question.type === "single" ? (hits ? 10 : 0)
+  const exact = selected.length === question.correct.length && hits === question.correct.length;
+  const score = exact ? 10 : question.type === "single" ? 0
     : Math.round(Math.max(0, hits / question.correct.length - wrong / distractors) * 100) / 10;
   return { selected: [...selected].sort(), score };
 }

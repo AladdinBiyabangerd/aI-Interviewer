@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { availableTopics, defaultTopics, levels, roadmapUrl, topics, type AnswerFeedback, type AssessmentView, type Level, type Reference } from "../../lib/assessment";
+import { availableTopics, defaultTopics, levels, roadmapUrl, topics, type AnswerFeedback, type AssessmentView, type Level, type PublicQuestion, type Reference } from "../../lib/assessment";
+import { Brand } from "../brand";
 import "../assessment.css";
 
 type Language = "az" | "en";
@@ -31,6 +32,46 @@ const errorMessages: Record<string, [string, string]> = {
 class AssessmentApiError extends Error {
   constructor(readonly code: string) { super(code); }
 }
+type QuestionTranslation = {
+  prompt: string;
+  options: Array<{ id: string; text: string }>;
+  explanation: string | null;
+};
+const codeLine = /^(?:\d+:\s|package\b|import\b|@\w+|(?:public|private|protected|static|final|abstract|class|interface|enum|record)\b|[{}]|\(.*\)\s*->)|[;{}]|::/;
+function prose(value: string) {
+  return value.split(/\n{2,}/).map((paragraph) => paragraph.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean).join("\n\n");
+}
+function QuestionText({ text, option = false }: { text: string; option?: boolean }) {
+  const lines = text.split("\n");
+  const codeStart = lines.findIndex((line) => codeLine.test(line.trim()));
+  if (codeStart < 0) {
+    const inlineCode = option && /(?:\w+\(.*\)|::|->|\[\]|==|!=)/.test(text);
+    return inlineCode ? <code className="qa-inline-code">{text}</code> : <span>{prose(text)}</span>;
+  }
+  const introduction = prose(lines.slice(0, codeStart).join("\n"));
+  const code = lines.slice(codeStart).join("\n").trim();
+  return <>
+    {introduction ? <span className="qa-question-copy">{introduction}</span> : null}
+    <pre className={option ? "qa-code-block qa-option-code" : "qa-code-block"}><code>{code}</code></pre>
+  </>;
+}
+function translationKey(question: PublicQuestion) {
+  return `${question.id}:${question.version}`;
+}
+function readTranslation(question: PublicQuestion): QuestionTranslation | null {
+  try {
+    const raw = localStorage.getItem(`ai-interviewer:translation:az:${translationKey(question)}`);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as QuestionTranslation;
+    return typeof value.prompt === "string" && Array.isArray(value.options)
+      && value.options.length === question.options.length ? value : null;
+  } catch { return null; }
+}
+function localizedQuestion(question: PublicQuestion, translation?: QuestionTranslation): PublicQuestion {
+  if (!translation) return question;
+  const options = question.options.map((option) => translation.options.find((item) => item.id === option.id) ?? option);
+  return { ...question, prompt: translation.prompt, options };
+}
 async function api(path: string, input?: object): Promise<AssessmentView | null> {
   const response = await fetch(path, { method: input ? "POST" : "GET", cache: "no-store",
     ...(input ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) } : {}) });
@@ -49,14 +90,14 @@ function draftSelection(assessment: AssessmentView | null): string[] {
 function References({ items, language }: { items: Reference[]; language: Language }) {
   return <ul className="qa-references">{items.map((item) => <li key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.title} <span aria-hidden="true">↗</span></a></li>)}{!items.length ? <li>{translate(language, "Mənbə yoxdur", "No references")}</li> : null}</ul>;
 }
-function Feedback({ feedback, busy, language, onRate }: { feedback: AnswerFeedback; busy: boolean; language: Language; onRate: (input: object) => void }) {
-  const q = feedback.question;
+function Feedback({ feedback, translation, busy, language, onRate }: { feedback: AnswerFeedback; translation?: QuestionTranslation; busy: boolean; language: Language; onRate: (input: object) => void }) {
+  const q = localizedQuestion(feedback.question, language === "az" ? translation : undefined);
   const t = (az: string, en: string) => translate(language, az, en);
   const chosen = q.options.filter((option) => feedback.selected.includes(option.id)).map((option) => option.text).join("; ");
   const correct = q.options.filter((option) => feedback.correct.includes(option.id)).map((option) => option.text).join("; ");
   return <section className="qa-feedback" aria-labelledby={`feedback-${q.id}`}>
     <div className="qa-feedback-heading"><div><p className="eyebrow">{t("Cavabın təhlili", "Answer feedback")}</p><h2 id={`feedback-${q.id}`}>{feedback.skipped ? t("Buraxılıb", "Skipped") : feedback.score === 10 ? t("Düzgün cavab", "Correct answer") : t("Nəzərdən keçirin", "Review this answer")}</h2></div><strong className="qa-answer-score">{feedback.skipped ? "—" : feedback.score}<span>{feedback.skipped ? "" : " / 10"}</span></strong></div>
-    <p>{feedback.explanation}</p>
+    <div className="qa-feedback-explanation"><QuestionText text={language === "az" && translation?.explanation ? translation.explanation : feedback.explanation} /></div>
     <div className="qa-answer-review"><p><b>{t("Sizin cavabınız:", "Your answer:")}</b> {feedback.skipped ? t("Buraxılıb", "Skipped") : chosen}</p><p><b>{t("Düzgün cavab:", "Correct answer:")}</b> {correct}</p></div>
     <h3>{t("Mənbə", "Source")}</h3><References items={feedback.references} language={language} />
     <div className="qa-question-feedback"><fieldset disabled={busy}><legend>{t("Bu sual faydalı idi?", "Was this question useful?")}</legend><div className="qa-stars">{[1, 2, 3, 4, 5].map((rating) => <button key={rating} type="button" aria-label={t(`${rating}/5 ulduz`, `Rate ${rating} out of 5 stars`)} aria-pressed={feedback.rating === rating} onClick={() => onRate({ questionId: q.id, rating })} className={(feedback.rating ?? 0) >= rating ? "selected" : ""}>★</button>)}</div>{feedback.rating ? <small role="status">{t("Saxlanıldı", "Saved")}: {feedback.rating}/5</small> : null}</fieldset>
@@ -79,12 +120,42 @@ export default function AssessmentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [finishPrompt, setFinishPrompt] = useState(false);
+  const [questionTranslations, setQuestionTranslations] = useState<Record<string, QuestionTranslation>>({});
+  const [translationErrors, setTranslationErrors] = useState<string[]>([]);
+  const pendingTranslations = useRef(new Set<string>());
   const requestId = useRef<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const t = (az: string, en: string) => translate(language, az, en);
   const question = assessment?.question;
   const finished = screen === "assessment" && assessment?.status === "completed";
   const draftKey = assessment && question ? `intervia:draft:${assessment.id}:${question.id}` : null;
+
+  const fetchTranslation = useCallback(async (target: PublicQuestion, review = false) => {
+    await Promise.resolve();
+    if (language !== "az" || !assessment?.id) return;
+    const key = translationKey(target);
+    const cached = readTranslation(target);
+    if (cached && (!review || cached.explanation)) {
+      setQuestionTranslations((current) => current[key] === cached ? current : { ...current, [key]: cached });
+      return;
+    }
+    const requestKey = `${key}:${review ? "review" : "question"}`;
+    if (pendingTranslations.current.has(requestKey)) return;
+    pendingTranslations.current.add(requestKey);
+    try {
+      const response = await fetch(`/api/assessments/${assessment.id}/translations/${target.id}${review ? "?review=1" : ""}`, { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok || !body.translation) throw new Error(body.code ?? "translation_unavailable");
+      const next = { ...(cached ?? {}), ...body.translation } as QuestionTranslation;
+      localStorage.setItem(`ai-interviewer:translation:az:${key}`, JSON.stringify(next));
+      setQuestionTranslations((current) => ({ ...current, [key]: next }));
+      setTranslationErrors((current) => current.filter((item) => item !== key));
+    } catch {
+      setTranslationErrors((current) => current.includes(key) ? current : [...current, key]);
+    } finally {
+      pendingTranslations.current.delete(requestKey);
+    }
+  }, [assessment, language]);
 
   useEffect(() => {
     let active = true;
@@ -101,6 +172,11 @@ export default function AssessmentPage() {
   }, []);
   useEffect(() => { document.documentElement.lang = language; }, [language]);
   useEffect(() => { if (screen === "assessment") heading.current?.focus(); }, [screen, question?.id, finished]);
+  useEffect(() => {
+    if (!question) return;
+    const timer = window.setTimeout(() => { void fetchTranslation(question); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchTranslation, question]);
 
   function choose(next: string[]) {
     setSelected(next);
@@ -158,10 +234,13 @@ export default function AssessmentPage() {
   function newAssessment() { setScreen("setup"); setError(null); setFinishPrompt(false); requestId.current = null; }
   const errorCode = error instanceof AssessmentApiError ? error.code : "request_failed";
   const errorText = errorMessages[errorCode];
+  const activeTranslation = question ? questionTranslations[translationKey(question)] : undefined;
+  const displayQuestion = question ? localizedQuestion(question, language === "az" ? activeTranslation : undefined) : null;
+  const activeTranslationFailed = question ? translationErrors.includes(translationKey(question)) : false;
 
   return <div className="qa-app">
     <a className="qa-skip-link" href="#qa-main">{t("Əsas məzmuna keç", "Skip to content")}</a>
-    <header className="qa-header"><div><Link className="brand" href="/"><span>I</span><b>Intervia</b></Link><span className="qa-header-label">{t("Java istiqaməti", "Java track")}</span><div className="qa-header-actions"><a href={roadmapUrl} target="_blank" rel="noreferrer">{t("Yol xəritəsi ↗", "Explore the roadmap ↗")}</a><label className="qa-language">{t("Dil", "Language")}<select value={language} onChange={(event) => { const next = event.target.value as Language; localStorage.setItem("intervia:language", next); setLanguage(next); }}><option value="az">AZ</option><option value="en">EN</option></select></label></div></div></header>
+    <header className="qa-header"><div><Brand /><span className="qa-header-label">{t("Java istiqaməti", "Java track")}</span><div className="qa-header-actions"><a href={roadmapUrl} target="_blank" rel="noreferrer">{t("Yol xəritəsi ↗", "Explore the roadmap ↗")}</a><label className="qa-language">{t("Dil", "Language")}<select value={language} onChange={(event) => { const next = event.target.value as Language; localStorage.setItem("intervia:language", next); setLanguage(next); }}><option value="az">AZ</option><option value="en">EN</option></select></label></div></div></header>
     <main id="qa-main" className="qa-main" tabIndex={-1}>
       <nav className="qa-breadcrumb" aria-label={t("Səhifə yolu", "Breadcrumb")}><Link href="/">← {t("Bütün istiqamətlər", "All tracks")}</Link><span aria-hidden="true">/</span><span>Java</span></nav>
       {error ? <div className="qa-error" role="alert"><p>{errorText ? translate(language, ...errorText) : t("Dəyişiklik saxlanmadı. Yenidən cəhd edin.", "Your change could not be saved. Please try again.")}</p><button type="button" disabled={busy} onClick={reload}>{t("Saxlanmış testi yenilə", "Reload saved assessment")}</button></div> : null}
@@ -169,13 +248,13 @@ export default function AssessmentPage() {
         <section className="qa-hero">
           <div>
             <p className="eyebrow">{t("Biliklərinizi sınayın", "Check your knowledge")}</p>
-            <h1>{t("Java biliklərinizi", "Build confidence in")}<br /><em>{t("Intervia ilə yoxlayın.", "your Java knowledge.")}</em></h1>
+            <h1>{t("Java biliklərinizi", "Build confidence in")}<br /><em>{t("AI Interviewer ilə yoxlayın.", "your Java knowledge.")}</em></h1>
             <p className="qa-lead">{t("Sualları öz tempinizdə cavablandırın, istədiyinizi buraxın və nəticələri yalnız sonda görün.", "Answer at your own pace, skip questions, and see all results at the end.")}</p>
             <a className="button button-primary qa-hero-cta" href="#qa-start">{t("Testinizi seçin", "Choose your assessment")} <span aria-hidden="true">→</span></a>
             <div className="qa-hero-pills"><span>{t("Geri qayıda bilərsiniz", "Go back anytime")}</span><span>{t("Cavablar sonda", "Answers at the end")}</span><span>{t("Sessiyanız saxlanır", "Your session is saved")}</span></div>
           </div>
           <aside className="qa-preview" aria-label={t("Test haqqında", "About the assessment")}>
-            <div className="qa-preview-top"><span>INTERVIA</span><span>JAVA</span></div>
+            <div className="qa-preview-top"><span>AI INTERVIEWER</span><span>JAVA</span></div>
             <p>{t("Öyrənin. Sınayın. Davam edin.", "Learn. Test. Continue.")}</p>
             <div className="qa-preview-option"><span aria-hidden="true">✓</span>{t("Cavablarını test bitəndə birlikdə nəzərdən keçir.", "Review all your answers once the assessment ends.")}</div>
             <p className="qa-preview-note">{t("Java və AI mövzuları və ya Java 8 kitabı üzrə məşq seç.", "Choose Java & AI topics or practice with the Java 8 book.")}</p>
@@ -184,7 +263,7 @@ export default function AssessmentPage() {
         <div id="qa-start" className="qa-start-anchor" aria-hidden="true" />
         {assessment ? <section className="qa-resume"><div><b>{assessment.status === "active" ? t("Testiniz saxlanılıb", "Your assessment is saved") : t("Son nəticəniz", "Your latest result")}</b><span>{assessment.mode === "book" ? t("Java 8 kitabı", "Java 8 book practice") : levelNames[assessment.level]} · {assessment.answered} {t("cavab", "answered")}{assessment.skipped ? ` · ${assessment.skipped} ${t("buraxılıb", "skipped")}` : ""}</span></div><button type="button" className="button button-secondary" onClick={() => { setScreen("assessment"); setError(null); }}>{assessment.status === "active" ? t("Davam et →", "Continue →") : t("Nəticəyə bax →", "View result →")}</button></section> : null}
         <form onSubmit={start} className="qa-setup"><div className="qa-section-heading"><div><p className="eyebrow">{t("Başlanğıc", "Your starting point")}</p><h2>{t("Testinizi seçin.", "Make this assessment yours.")}</h2></div><p>{t("15 suala qədər · Öz tempinizdə", "Up to 15 questions · At your pace")}</p></div>
-          <fieldset className="qa-mode"><legend>{t("Sual mənbəyi", "Choose a question set")}</legend><div><label><input type="radio" name="mode" checked={mode === "roadmap"} disabled={busy} onChange={() => { setMode("roadmap"); requestId.current = null; }} /><span><b>{t("Java və AI testi", "Java & AI assessment")}</b><small>{t("Mövzu və səviyyəyə uyğunlaşan suallar. Sual mətnləri hələ ingilis dilindədir.", "Adaptive questions from the general bank.")}</small></span></label><label><input type="radio" name="mode" checked={mode === "book"} disabled={busy} onChange={() => { setMode("book"); requestId.current = null; }} /><span><b>{t("Java 8 kitabı üzrə məşq", "Java 8 book practice")}</b><small>{t("Kitabdan təsadüfi seçilən 15 sual. Kitabın sualları hələ ingilis dilindədir.", "15 sampled questions from the book. Source text is automatically extracted.")}</small></span></label></div></fieldset>
+          <fieldset className="qa-mode"><legend>{t("Sual mənbəyi", "Choose a question set")}</legend><div><label><input type="radio" name="mode" checked={mode === "roadmap"} disabled={busy} onChange={() => { setMode("roadmap"); requestId.current = null; }} /><span><b>{t("Java və AI testi", "Java & AI assessment")}</b><small>{t("Mövzu və səviyyəyə uyğunlaşan, Azərbaycan və ingilis dillərində suallar.", "Adaptive questions from the general bank in Azerbaijani and English.")}</small></span></label><label><input type="radio" name="mode" checked={mode === "book"} disabled={busy} onChange={() => { setMode("book"); requestId.current = null; }} /><span><b>{t("Java 8 kitabı üzrə məşq", "Java 8 book practice")}</b><small>{t("Kitabdan təsadüfi seçilən 15 sual. Kod dəyişmədən saxlanılır, izahlar və şərtlər Azərbaycan dilində göstərilir.", "15 sampled questions from the book, with code preserved exactly.")}</small></span></label></div></fieldset>
           {mode === "roadmap" ? <><fieldset className="qa-levels" disabled={busy}><legend>{t("1. Səviyyəni seç", "1. Choose your level")}</legend><div>{levels.map((item, index) => <label key={item} className={level === item ? "active" : ""}><input type="radio" name="level" checked={level === item} onChange={() => changeLevel(item)} /><span className="qa-level-number">0{index + 1}</span><b>{language === "az" ? levelNames[item] : item}</b><small>{item === "Junior" ? t("Java və backend əsasları", "Everyday Java & backend foundations") : item === "Mid" ? t("İstehsal sistemləri və AI", "Production services & AI integration") : t("Paralellik, paylanmış sistemlər və AI", "Concurrency, distributed systems & AI reliability")}</small><span className="qa-radio-dot" aria-hidden="true" /></label>)}</div></fieldset>
             <fieldset className="qa-topics" disabled={busy}><legend>{t("2. Altı mövzuya qədər seç", "2. Pick up to six topics")} <span>{topicIds.length} {t("seçilib", "selected")}</span></legend><div>{availableTopics(level).map((topic) => <label key={topic.id} className={topicIds.includes(topic.id) ? "active" : ""}><input type="checkbox" checked={topicIds.includes(topic.id)} disabled={!topicIds.includes(topic.id) && topicIds.length >= 6} onChange={(event) => { setTopicIds(event.target.checked ? [...topicIds, topic.id] : topicIds.filter((id) => id !== topic.id)); requestId.current = null; }} /><span><b>{language === "az" ? topicNames[topic.id] : topic.title}</b><small>{language === "en" ? topic.summary : t("Mövzu üzrə suallar", "Questions in this topic")}</small></span></label>)}</div></fieldset>
             <div className="qa-company"><label className="qa-toggle"><input type="checkbox" checked={companyMode} disabled={busy} onChange={(event) => { setCompanyMode(event.target.checked); requestId.current = null; }} /><span><b>{t("Şirkət konteksti əlavə et", "Add company context")}</b><small>{t("İstəyə bağlıdır. Ümumi test əsas seçimdir.", "Optional. Your assessment is general by default.")}</small></span></label>{companyMode ? <div className="qa-company-input"><label>{t("Şirkətin adı", "Company name")}<input disabled={busy} required value={company} maxLength={100} placeholder="məs. PASHA Bank" onChange={(event) => { setCompany(event.target.value); requestId.current = null; }} /></label><p>{t("Yalnız mənbəsi məlum olan şirkət sualları istifadə olunur. Mövcud deyilsə, ümumi suallar göstərilir.", "Only sourced company questions are used. Otherwise you receive general questions.")}</p></div> : null}</div></> : null}
@@ -193,7 +272,7 @@ export default function AssessmentPage() {
       </> : assessment ? <><div className="qa-session-heading"><div><p className="eyebrow">{finished ? t("Nəticə", "Your result") : assessment.mode === "book" ? t("Java 8 kitabı üzrə məşq", "Java 8 book practice") : `${language === "az" ? levelNames[assessment.level] : assessment.level} · Java`}</p><h1 ref={heading} tabIndex={-1}>{finished ? t("Nəticələriniz hazırdır.", "Your results are ready.") : assessment.mode === "book" ? question?.tags[2] : language === "az" ? topicNames[question?.topic ?? ""] : topics.find((topic) => topic.id === question?.topic)?.title}</h1></div><button type="button" className="qa-text-button" disabled={busy} onClick={newAssessment}>{t("Yeni test", "New assessment")}</button></div>
         {assessment.companyNotice ? <p className="qa-notice">{assessment.companyNotice}</p> : null}
         {!finished ? <><div className="qa-progress-label"><span>{t("Sual", "Question")} {assessment.currentIndex} · {assessment.answered} {t("cavablandı", "answered")} · {assessment.skipped} {t("buraxıldı", "skipped")}</span><b>{t("Maksimum", "Up to")} {assessment.maximumQuestions} {t("sual", "questions")}</b></div><progress className="qa-progress" value={assessment.completedTopics} max={assessment.totalTopics} aria-label={t(`${assessment.completedCount} sual tamamlanıb`, `${assessment.completedCount} questions completed`)} />
-          {question ? <section className="qa-question" key={question.id}><div className="qa-question-meta"><span>{question.type === "single" ? t("Bir cavab seç", "Choose one answer") : t("Bütün düzgün cavabları seç", "Select all correct answers")}</span><span>{assessment.mode === "book" ? question.tags[1] : `${t("Çətinlik", "Complexity")} ${question.complexity}/10`}</span></div><form onSubmit={(event) => { event.preventDefault(); mutate({ action: "answer", questionId: question.id, selected }, true); }}><fieldset disabled={busy}><legend>{question.prompt}</legend><div className="qa-options">{question.options.map((option, index) => <label key={option.id} className={selected.includes(option.id) ? "selected" : ""}><input type={question.type === "single" ? "radio" : "checkbox"} name="answer" value={option.id} checked={selected.includes(option.id)} onChange={(event) => choose(question.type === "single" ? [option.id] : event.target.checked ? [...selected, option.id] : selected.filter((id) => id !== option.id))} /><span className="qa-option-letter" aria-hidden="true">{String.fromCharCode(65 + index)}</span><span>{option.text}</span></label>)}</div></fieldset><div className="qa-question-source"><div className="qa-tags">{question.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><p>{t("Mənbə", "Source")}: <a href={question.source.url} target="_blank" rel="noreferrer">{question.source.title} ↗</a></p></div><div className="qa-question-submit"><p>{assessment.mode === "book" && language === "az" ? "Kitab sualının mətni orijinal ingilis dilindədir." : t("Düzgün cavablar testin sonunda göstəriləcək.", "Correct answers appear at the end.")}</p><div className="qa-question-actions"><button type="button" className="button button-secondary" disabled={busy} onClick={() => assessment.canGoBack ? mutate({ action: "back" }) : newAssessment()} aria-label={assessment.canGoBack ? t("Əvvəlki suala qayıt", "Go to previous question") : t("Test seçiminə qayıt", "Back to assessment setup")}>{t("← Geri", "← Back")}</button><button type="button" className="button button-secondary" disabled={busy} onClick={() => mutate({ action: "answer", questionId: question.id, selected: null }, true)}>{t("Boş burax", "Skip")}</button><button type="submit" className="button button-primary" disabled={busy || !selected.length}>{busy ? t("Saxlanır…", "Saving…") : assessment.readyToFinish ? t("Cavabı saxla", "Save answer") : t("Növbəti →", "Next →")}</button></div></div></form></section> : null}
+          {question && displayQuestion ? <section className="qa-question" key={question.id}><div className="qa-question-meta"><span>{question.type === "single" ? t("Bir cavab seç", "Choose one answer") : t("Bütün düzgün cavabları seç", "Select all correct answers")}</span><span>{language === "az" && !activeTranslation ? activeTranslationFailed ? "Orijinal mətn göstərilir" : "Azərbaycancaya çevrilir…" : assessment.mode === "book" ? question.tags[1] : `${t("Çətinlik", "Complexity")} ${question.complexity}/10`}</span></div><form onSubmit={(event) => { event.preventDefault(); mutate({ action: "answer", questionId: question.id, selected }, true); }}><fieldset disabled={busy}><legend className="qa-visually-hidden">{displayQuestion.prompt}</legend><div className="qa-question-prompt" aria-hidden="true"><QuestionText text={displayQuestion.prompt} /></div><div className="qa-options">{displayQuestion.options.map((option, index) => <label key={option.id} className={selected.includes(option.id) ? "selected" : ""}><input type={question.type === "single" ? "radio" : "checkbox"} name="answer" value={option.id} checked={selected.includes(option.id)} onChange={(event) => choose(question.type === "single" ? [option.id] : event.target.checked ? [...selected, option.id] : selected.filter((id) => id !== option.id))} /><span className="qa-option-letter" aria-hidden="true">{String.fromCharCode(65 + index)}</span><span className="qa-option-text"><QuestionText text={option.text} option /></span></label>)}</div></fieldset><div className="qa-question-source"><div className="qa-tags">{question.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><p>{t("Mənbə", "Source")}: <a href={question.source.url} target="_blank" rel="noreferrer">{question.source.title} ↗</a></p></div><div className="qa-question-submit"><p>{language === "az" && activeTranslationFailed ? "Azərbaycan dilində tərcümə hazırda əlçatan deyil; orijinal mətn göstərilir." : t("Kod nümunələri dəyişdirilmədən saxlanılır. Düzgün cavablar testin sonunda göstəriləcək.", "Code samples are preserved exactly. Correct answers appear at the end.")}</p><div className="qa-question-actions"><button type="button" className="button button-secondary" disabled={busy} onClick={() => assessment.canGoBack ? mutate({ action: "back" }) : newAssessment()} aria-label={assessment.canGoBack ? t("Əvvəlki suala qayıt", "Go to previous question") : t("Test seçiminə qayıt", "Back to assessment setup")}>{t("← Geri", "← Back")}</button><button type="button" className="button button-secondary" disabled={busy} onClick={() => mutate({ action: "answer", questionId: question.id, selected: null }, true)}>{t("Boş burax", "Skip")}</button><button type="submit" className="button button-primary" disabled={busy || !selected.length}>{busy ? t("Saxlanır…", "Saving…") : assessment.readyToFinish ? t("Cavabı saxla", "Save answer") : t("Növbəti →", "Next →")}</button></div></div></form></section> : null}
           {assessment.mode === "roadmap" && assessment.canGoBack ? <p className="qa-navigation-note">{t("Əvvəlki cavabı dəyişsəniz, ondan sonrakı adaptiv suallar yenidən seçiləcək.", "Changing an earlier answer recalculates the later adaptive questions.")}</p> : null}
           {assessment.readyToFinish ? <div className="qa-finish-early"><button type="button" className="button button-primary" disabled={busy} onClick={finishCurrent}>{t("Bitir və nəticəyə bax →", "Finish and see results →")}</button></div> : assessment.completedCount > 0 ? <div className="qa-finish-early">{finishPrompt ? <><p>{t("İndi bitirmək istəyirsiniz? Bal yalnız cavablandırdığınız suallara görə hesablanacaq.", "Finish now? Only answered questions count toward your score.")}</p><button disabled={busy} type="button" className="button button-secondary" onClick={() => mutate({ action: "finish" })}>{t("Bitir və nəticəyə bax", "Finish and see results")}</button><button type="button" disabled={busy} className="qa-text-button" onClick={() => setFinishPrompt(false)}>{t("Davam et", "Keep going")}</button></> : <button className="qa-text-button" type="button" disabled={busy} onClick={() => setFinishPrompt(true)}>{t("Testi erkən bitir", "Finish assessment early")}</button>}</div> : null}
         </> : <><section className="qa-result-hero">
@@ -222,10 +301,14 @@ export default function AssessmentPage() {
               </tr>)}</tbody>
             </table></div>
           </section> : null}
-          <section className="qa-history"><h2>{t("Suallar və cavablar", "Questions and answers")}</h2>{assessment.history.map((answer, index) => <details key={answer.question.id}><summary><span>{index + 1}. {answer.question.prompt}</span><b>{answer.skipped ? "—" : `${answer.score}/10`}</b></summary><Feedback feedback={answer} busy={busy} language={language} onRate={(input) => mutate({ action: "feedback", ...input })} /></details>)}</section>
+          <section className="qa-history"><h2>{t("Suallar və cavablar", "Questions and answers")}</h2>{assessment.history.map((answer, index) => {
+            const answerTranslation = questionTranslations[translationKey(answer.question)];
+            const translated = localizedQuestion(answer.question, language === "az" ? answerTranslation : undefined);
+            return <details key={answer.question.id} onToggle={(event) => { if (event.currentTarget.open) void fetchTranslation(answer.question, true); }}><summary><span>{index + 1}. {prose(translated.prompt)}</span><b>{answer.skipped ? "—" : `${answer.score}/10`}</b></summary><Feedback feedback={answer} translation={answerTranslation} busy={busy} language={language} onRate={(input) => mutate({ action: "feedback", ...input })} /></details>;
+          })}</section>
           <div className="qa-result-actions"><button type="button" className="button button-primary" onClick={newAssessment}>{t("Yeni testə başlayın →", "Start another assessment →")}</button><button type="button" className="button button-secondary" onClick={() => window.print()}>{t("Çap edin / saxlayın", "Print / save result")}</button></div>
         </>}
       </> : null}
-    </main><footer className="qa-footer"><span>Intervia · {t("Öyrənməyə davam et.", "Keep learning.")}</span><span>Java & AI</span></footer>
+    </main><footer className="qa-footer"><span>AI Interviewer · {t("Öyrənməyə davam et.", "Keep learning.")}</span><span>Java & AI</span></footer>
   </div>;
 }
