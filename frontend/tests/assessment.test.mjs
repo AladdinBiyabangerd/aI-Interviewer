@@ -15,15 +15,37 @@ function correct(state) { return answerQuestion(state, state.currentId, current(
 
 test("the versioned bank has valid answers, sources and a three-step ladder for every roadmap topic", () => {
   validateBank(questionBank);
-  assert.equal(questionBank.length, 45);
+  assert.equal(questionBank.length, 135);
   for (const topic of topics) {
     const questions = questionBank.filter((q) => q.topic === topic.id);
-    assert.equal(questions.length, 3);
+    assert.equal(questions.length, 9);
     assert.equal(new Set(questions.map((q) => q.complexity)).size, 3);
+    for (const complexity of new Set(questions.map((q) => q.complexity))) {
+      assert.equal(questions.filter((q) => q.complexity === complexity).length, 3);
+    }
   }
   assert.throws(() => validateBank([{ ...questionBank[0], correct: ["missing"] }]));
   assert.throws(() => validateBank([{ ...questionBank[0], type: "open" }]));
   assert.throws(() => validateBank([{ ...questionBank[0], companyContexts: [{ company: "Bank", role: "Junior" }] }]));
+});
+test("three consecutive roadmap sessions rotate exact questions without breaking deterministic navigation", () => {
+  const exposure = {};
+  const delivered = [];
+  for (let session = 1; session <= 3; session++) {
+    const id = `rotation-session-${session}`;
+    let state = startAssessment(id, parseSetup({ level: "Junior", topicIds: defaultTopics.Junior, company: null }), questionBank, exposure);
+    assert.equal(startAssessment(id, parseSetup({ level: "Junior", topicIds: defaultTopics.Junior, company: null }), questionBank, exposure).currentId, state.currentId);
+    const ids = [];
+    while (state.currentId) {
+      ids.push(state.currentId);
+      state = answerQuestion(state, state.currentId, current(state).correct);
+    }
+    assert.equal(ids.length, 15);
+    assert.equal(new Set(ids).size, 15);
+    assert.equal(ids.filter((questionId) => delivered.flat().includes(questionId)).length, 0);
+    delivered.push(ids);
+    for (const questionId of ids) exposure[questionId] = (exposure[questionId] ?? 0) + 1;
+  }
 });
 test("Junior scope cannot activate advanced topics, invalid levels or duplicate topics", () => {
   for (const input of [{ level: "Junior", topicIds: ["concurrency"] }, { level: "Lead", topicIds: ["spring"] },

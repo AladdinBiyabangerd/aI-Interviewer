@@ -10,6 +10,7 @@ export type AssessmentState = {
   id: string; level: Level; company: string | null; topicIds: string[];
   questions: BankQuestion[]; answers: StoredAnswer[]; currentId: string | null;
   finishedEarly: boolean;
+  priorQuestionExposure?: Record<string, number>;
 };
 export class AssessmentError extends Error {
   status: number;
@@ -32,6 +33,14 @@ export function parseSetup(value: unknown): { mode: "roadmap" | "book"; level: L
 
 function sameCompany(a: string, b: string) { return a.trim().toLowerCase() === b.trim().toLowerCase(); }
 const caps: Record<Level, number> = { Junior: 4, Mid: 7, Senior: 10 };
+function stableRank(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
 function selectQuestion(state: AssessmentState, topicId: string, minimum = -1): BankQuestion | undefined {
   const asked = new Set(state.answers.map((a) => a.questionId));
   // Company-specific material is capped at one in five delivered questions. Every
@@ -40,15 +49,19 @@ function selectQuestion(state: AssessmentState, topicId: string, minimum = -1): 
   const allowCompany = minimum >= 0 && contextualCount < Math.floor((state.answers.length + 1) / 5);
   return state.questions.filter((q) => q.topic === topicId && q.complexity > minimum && !asked.has(q.id)
     && (!q.companyContexts.length || (allowCompany && state.company && q.companyContexts.some((c) => sameCompany(c.company, state.company!)))))
-    .sort((a, b) => a.complexity - b.complexity || Number(Boolean(b.companyContexts.length)) - Number(Boolean(a.companyContexts.length)) || a.id.localeCompare(b.id))[0];
+    .sort((a, b) => a.complexity - b.complexity
+      || Number(Boolean(b.companyContexts.length)) - Number(Boolean(a.companyContexts.length))
+      || (state.priorQuestionExposure?.[a.id] ?? 0) - (state.priorQuestionExposure?.[b.id] ?? 0)
+      || stableRank(`${state.id}:${topicId}:${minimum}:${a.id}`) - stableRank(`${state.id}:${topicId}:${minimum}:${b.id}`)
+      || a.id.localeCompare(b.id))[0];
 }
 
-export function startAssessment(id: string, setup: Omit<ReturnType<typeof parseSetup>, "mode"> & { mode?: "roadmap" | "book" }, bank: BankQuestion[]): AssessmentState {
+export function startAssessment(id: string, setup: Omit<ReturnType<typeof parseSetup>, "mode"> & { mode?: "roadmap" | "book" }, bank: BankQuestion[], priorQuestionExposure: Record<string, number> = {}): AssessmentState {
   const state: AssessmentState = {
     id, ...setup, mode: "roadmap", questions: bank.filter((q) => q.status === "published" && q.collection !== "book" && setup.topicIds.includes(q.topic)
       && levels.indexOf(q.level) <= levels.indexOf(setup.level) && q.complexity <= caps[setup.level]
       && (!q.companyContexts.length || (setup.company && q.companyContexts.some((c) => sameCompany(c.company, setup.company!))))),
-    answers: [], currentId: null, finishedEarly: false,
+    answers: [], currentId: null, finishedEarly: false, priorQuestionExposure,
   };
   for (const topic of setup.topicIds) {
     if (!selectQuestion(state, topic)) throw new AssessmentError("topic_unavailable", 503);

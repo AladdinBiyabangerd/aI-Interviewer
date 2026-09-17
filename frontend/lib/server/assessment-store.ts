@@ -30,6 +30,17 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   } catch { throw new AssessmentError("invalid_json"); }
 }
 
+function recentQuestionExposure(states: AssessmentState[]): Record<string, number> {
+  const exposure: Record<string, number> = {};
+  for (const state of states) {
+    const delivered = state.turnIds?.length
+      ? state.turnIds
+      : [...state.answers.map((answer) => answer.questionId), ...(state.currentId ? [state.currentId] : [])];
+    for (const questionId of new Set(delivered)) exposure[questionId] = (exposure[questionId] ?? 0) + 1;
+  }
+  return exposure;
+}
+
 export async function assessmentRequest(request: Request, id?: string) {
   try {
     const session = sessionFor(request);
@@ -58,6 +69,13 @@ export async function assessmentRequest(request: Request, id?: string) {
         }
         const recent = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM java_assessment_sessions WHERE owner_hash = ${session.ownerHash} AND created_at > now() - interval '10 minutes'`;
         if (recent[0].count >= 10) throw new AssessmentError("rate_limited", 429);
+        const priorSessions = setup.mode === "roadmap"
+          ? await tx<{ state: AssessmentState }[]>`
+            SELECT state FROM java_assessment_sessions
+            WHERE owner_hash = ${session.ownerHash} AND expires_at > now()
+              AND coalesce(state->>'mode', 'roadmap') = 'roadmap'
+            ORDER BY created_at DESC, id DESC LIMIT 6`
+          : [];
         const rows = setup.mode === "book"
           ? await tx<{ question: BankQuestion; status: BankQuestion["status"] }[]>`
             SELECT question, status FROM java_question_bank WHERE status = 'published'
@@ -68,7 +86,9 @@ export async function assessmentRequest(request: Request, id?: string) {
             ) latest WHERE status = 'published' AND question->>'collection' IS DISTINCT FROM 'book'`;
         const bank = rows.map((r) => ({ ...r.question, status: r.status }));
         const eligibleBank = setup.mode === "book" ? bank.filter(hasConsistentBookAnswer).slice(0, 15) : bank;
-        const next = withDeferredResults(setup.mode === "book" ? startBookAssessment(newId, eligibleBank) : startAssessment(newId, setup, eligibleBank));
+        const next = withDeferredResults(setup.mode === "book"
+          ? startBookAssessment(newId, eligibleBank)
+          : startAssessment(newId, setup, eligibleBank, recentQuestionExposure(priorSessions.map((row) => row.state))));
         await tx`INSERT INTO java_assessment_sessions (id, owner_hash, state, expires_at)
           VALUES (${newId}, ${session.ownerHash}, ${tx.json(next)}, now() + (${retentionDays()} * interval '1 day'))`;
         return next;
