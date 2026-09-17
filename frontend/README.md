@@ -38,10 +38,20 @@ current assessment unless approved cleanup of historical artifacts still needs t
 
 ## Local development
 
-Node.js 22.13 or newer and a PostgreSQL database at migration head are required. Copy
-`.env.example` to the ignored `.env.local`, use non-production credentials, then run:
+Node.js 22.13 or newer and a PostgreSQL database at migration head are required.
 
-```powershell
+**Easiest:** from the **monorepo root** run one script (DB + API + this app):
+
+```bash
+./scripts/dev-up.sh
+```
+
+Or only this frontend (DB must already be up and migrated):
+
+```bash
+# copy once if missing
+cp .env.example .env.local   # then set DATABASE_URL / secrets — see root README
+
 npm install
 npm run dev
 ```

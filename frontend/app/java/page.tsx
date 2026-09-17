@@ -5,6 +5,7 @@ import Link from "next/link";
 import { availableTopics, defaultTopics, levels, roadmapUrl, topics, type AnswerFeedback, type AssessmentView, type Level, type PublicQuestion, type Reference } from "../../lib/assessment";
 import { highlightJava } from "../../lib/java-syntax";
 import { Brand } from "../brand";
+import { PortalAccountChip } from "../portal-account-chip";
 import "../assessment.css";
 
 type Language = "az" | "en";
@@ -267,7 +268,7 @@ export default function AssessmentPage() {
 
   return <div className="qa-app">
     <a className="qa-skip-link" href="#qa-main">{t("Əsas məzmuna keç", "Skip to content")}</a>
-    <header className="qa-header"><div><Brand /><span className="qa-header-label">{t("Java istiqaməti", "Java track")}</span><div className="qa-header-actions"><a href={roadmapUrl} target="_blank" rel="noreferrer">{t("Yol xəritəsi ↗", "Explore the roadmap ↗")}</a><label className="qa-language">{t("Dil", "Language")}<select value={language} onChange={(event) => { const next = event.target.value as Language; localStorage.setItem("intervia:language", next); setLanguage(next); }}><option value="az">AZ</option><option value="en">EN</option></select></label></div></div></header>
+    <header className="qa-header"><div><Brand /><span className="qa-header-label">{t("Java istiqaməti", "Java track")}</span><div className="qa-header-actions"><a href={roadmapUrl} target="_blank" rel="noreferrer">{t("Yol xəritəsi ↗", "Explore the roadmap ↗")}</a><label className="qa-language">{t("Dil", "Language")}<select value={language} onChange={(event) => { const next = event.target.value as Language; localStorage.setItem("intervia:language", next); setLanguage(next); }}><option value="az">AZ</option><option value="en">EN</option></select></label><PortalAccountChip language={language} /></div></div></header>
     <main id="qa-main" className="qa-main" tabIndex={-1}>
       <nav className="qa-breadcrumb" aria-label={t("Səhifə yolu", "Breadcrumb")}><Link href="/">← {t("Bütün istiqamətlər", "All tracks")}</Link><span aria-hidden="true">/</span><span>Java</span></nav>
       {error ? <div className="qa-error" role="alert"><p>{errorText ? translate(language, ...errorText) : t("Dəyişiklik saxlanmadı. Yenidən cəhd edin.", "Your change could not be saved. Please try again.")}</p><button type="button" disabled={busy} onClick={reload}>{t("Saxlanmış testi yenilə", "Reload saved assessment")}</button></div> : null}

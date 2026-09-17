@@ -32,6 +32,76 @@
 .qa-header-actions { margin-left: auto; display: flex; align-items: center; gap: 26px; }
 .qa-header-actions a { color: var(--qa-muted); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .qa-header-actions a:hover { color: var(--qa-green); }
+.qa-portal-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 4px;
+}
+.qa-portal-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 180px;
+  color: var(--qa-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.qa-portal-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #092f84;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.qa-portal-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qa-portal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #001fff;
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.qa-portal-btn:hover {
+  background: #0016cc;
+  color: #fff !important;
+}
+.qa-portal-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--qa-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--qa-muted) !important;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.qa-portal-logout:hover {
+  border-color: #c8d2e4;
+  background: #f4f7fc;
+  color: var(--qa-ink) !important;
+}
 .qa-language { display: flex; align-items: center; gap: 8px; color: var(--qa-muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .qa-language select { min-width: 58px; border: 1px solid var(--qa-line); border-radius: 8px; padding: 7px 9px; background: #fff; color: var(--qa-green); font-size: 12px; font-weight: 750; }
 .qa-main { max-width: 1240px; margin: 0 auto; padding: 0 36px 96px; }
@@ -283,6 +353,10 @@
   .qa-header > div { min-height: 66px; padding: 0 20px; gap: 10px; }
   .qa-header-actions { gap: 12px; }
   .qa-header-actions a { display: none; }
+  .qa-header-actions .qa-portal-btn,
+  .qa-header-actions .qa-portal-logout,
+  .qa-header-actions .qa-portal-account { display: inline-flex; }
+  .qa-portal-name-text { display: none; }
   .qa-main { padding: 0 20px 64px; }
   .qa-hero { grid-template-columns: 1fr; gap: 32px; padding: 56px 0 53px; }
   .qa-hero::before { width: 350px; height: 350px; right: 0; top: 210px; }

@@ -7,7 +7,52 @@ interviews are no longer public. See the [assessment setup and review guide](doc
 and [ADR 0030](docs/adr/0030-general-java-question-assessment.md). The historical Python
 platform scope below remains separate from this public-product change.
 
-Production-oriented implementation of the candidate-preparation platform described in the supplied technical plan. Development is intentionally incremental: a phase must satisfy its exit gate before work starts on dependent product capabilities.
+## Quick start (Start All)
+
+Same pattern as ingress-academy: one block, everything local.
+
+**Requires:** Docker Desktop, [uv](https://docs.astral.sh/uv/), Node.js 22+.
+
+```bash
+cd "/Users/mac/My Workspace/My projects/ingress_interview_platform"
+./scripts/dev-up.sh
+```
+
+If Docker was closed, the script opens **Docker Desktop** and waits, then starts:
+
+1. Postgres (`docker compose`)
+2. Migrations
+3. API on http://127.0.0.1:8001
+4. Next.js on http://localhost:3000
+
+Open:
+
+- http://localhost:3000 — home  
+- http://localhost:3000/java — Java assessment  
+- http://127.0.0.1:8001/api/v1/health/live — API  
+
+First time (empty question bank):
+
+```bash
+SEED_QUESTION_BANK=1 ./scripts/dev-up.sh
+```
+
+Stop with `Ctrl+C`.
+
+Portal SSO (“Sign in with Ingress”): also run ingress-academy on `:8000` **with a fresh
+process** after OIDC env is set (so `OIDC_ISSUER=http://127.0.0.1:8000/` is loaded):
+
+```bash
+cd "/Users/mac/My Workspace/My projects/ingress-academy"
+source .venv/bin/activate
+python manage.py runserver 127.0.0.1:8000
+```
+
+Then on http://localhost:3000 click **Sign in with Ingress**. Success shows an `account_id`.
+If you see `sso_error=iss_mismatch` or `api_rejected_token`, restart the portal (old
+process may still use `SITE_BASE_URL=https://ingress.academy` as issuer).
+
+In Cursor: **Terminal → Run Task → Start All** (`.vscode/tasks.json`).
 
 ## Current scope
 
@@ -35,6 +80,20 @@ For a single detailed account of everything implemented from the beginning, see 
 - [uv](https://docs.astral.sh/uv/)
 - Docker, for PostgreSQL integration and container verification
 - Node.js 22.13 or newer, for the interactive frontend demo
+
+## Local full stack
+
+See **[Quick start (Start All)](#quick-start-start-all)** above. Manual equivalent:
+
+```bash
+# Start Docker Desktop first if needed, then:
+docker compose up --detach --wait --build postgres
+uv sync --frozen
+uv run ai-interviewer-migrate upgrade
+uv run uvicorn ai_interviewer.main:app --host 127.0.0.1 --port 8001
+# other terminal:
+cd frontend && npm install && npm run dev
+```
 
 ## Public Java assessment application
 

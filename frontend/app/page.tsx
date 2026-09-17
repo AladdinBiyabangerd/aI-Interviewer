@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Brand } from "./brand";
+import { PortalAccountChip } from "./portal-account-chip";
 import "./assessment.css";
 
 type Language = "az" | "en";
@@ -32,6 +33,7 @@ export default function HomePage() {
         <label className="qa-language">{t("Dil", "Language")}
           <select value={language} onChange={(event) => { const next = event.target.value as Language; localStorage.setItem("intervia:language", next); setLanguage(next); }}><option value="az">AZ</option><option value="en">EN</option></select>
         </label>
+        <PortalAccountChip language={language} />
       </div>
     </div></header>
 
