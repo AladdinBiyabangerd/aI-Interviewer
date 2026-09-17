@@ -4,6 +4,7 @@ import type { BankQuestion } from "./assessment-bank.ts";
 export type StoredAnswer = { questionId: string; selected: string[] | null; score: number | null; rating: number | null; flag: string | null };
 export type AssessmentState = {
   mode?: "roadmap" | "book";
+  questionCount?: number;
   flowVersion?: 2;
   turnIds?: string[];
   cursor?: number;
@@ -16,19 +17,28 @@ export class AssessmentError extends Error {
   status: number;
   constructor(message: string, status = 400) { super(message); this.status = status; }
 }
-export function parseSetup(value: unknown): { mode: "roadmap" | "book"; level: Level; company: string | null; topicIds: string[] } {
+export function parseSetup(value: unknown): { mode: "roadmap" | "book"; level: Level; company: string | null; topicIds: string[]; questionCount: number } {
   if (!value || typeof value !== "object") throw new AssessmentError("invalid_setup");
   const v = value as Record<string, unknown>;
-  if (v.mode === "book") return { mode: "book", level: "Senior", company: null, topicIds: ["core-java"] };
+  if (v.mode === "book") {
+    const questionCount = v.questionCount === undefined ? 15 : v.questionCount;
+    if (!Number.isInteger(questionCount) || (questionCount as number) < 5 || (questionCount as number) > 50
+      || (questionCount as number) % 5 !== 0) throw new AssessmentError("invalid_setup");
+    return { mode: "book", level: "Senior", company: null, topicIds: ["core-java"], questionCount: questionCount as number };
+  }
   if (v.mode !== undefined && v.mode !== "roadmap") throw new AssessmentError("invalid_setup");
+  const topicIds = Array.isArray(v.topicIds) ? v.topicIds as string[] : [];
+  const questionCount = v.questionCount === undefined ? topicIds.length * 3 : v.questionCount;
   if (!levels.includes(v.level as Level) || !Array.isArray(v.topicIds)
     || v.topicIds.length < 1 || v.topicIds.length > 6
     || v.topicIds.some((id) => typeof id !== "string" || !availableTopics(v.level as Level).some((t) => t.id === id))
     || new Set(v.topicIds).size !== v.topicIds.length
+    || !Number.isInteger(questionCount) || (questionCount as number) % v.topicIds.length !== 0
+    || (questionCount as number) < v.topicIds.length || (questionCount as number) > v.topicIds.length * 3
     || (v.company !== null && v.company !== undefined && (typeof v.company !== "string" || v.company.length > 100))) {
     throw new AssessmentError("invalid_setup");
   }
-  return { mode: "roadmap", level: v.level as Level, company: typeof v.company === "string" ? v.company.trim() || null : null, topicIds: v.topicIds as string[] };
+  return { mode: "roadmap", level: v.level as Level, company: typeof v.company === "string" ? v.company.trim() || null : null, topicIds, questionCount: questionCount as number };
 }
 
 function sameCompany(a: string, b: string) { return a.trim().toLowerCase() === b.trim().toLowerCase(); }
@@ -40,6 +50,12 @@ function stableRank(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+}
+function questionLimit(state: AssessmentState): number {
+  return state.questionCount ?? (state.mode === "book" ? state.questions.length : state.topicIds.length * 3);
+}
+function questionsPerTopic(state: AssessmentState): number {
+  return Math.max(1, Math.floor(questionLimit(state) / state.topicIds.length));
 }
 function selectQuestion(state: AssessmentState, topicId: string, minimum = -1): BankQuestion | undefined {
   const asked = new Set(state.answers.map((a) => a.questionId));
@@ -56,7 +72,7 @@ function selectQuestion(state: AssessmentState, topicId: string, minimum = -1): 
       || a.id.localeCompare(b.id))[0];
 }
 
-export function startAssessment(id: string, setup: Omit<ReturnType<typeof parseSetup>, "mode"> & { mode?: "roadmap" | "book" }, bank: BankQuestion[], priorQuestionExposure: Record<string, number> = {}): AssessmentState {
+export function startAssessment(id: string, setup: Omit<ReturnType<typeof parseSetup>, "mode" | "questionCount"> & { mode?: "roadmap" | "book"; questionCount?: number }, bank: BankQuestion[], priorQuestionExposure: Record<string, number> = {}): AssessmentState {
   const state: AssessmentState = {
     id, ...setup, mode: "roadmap", questions: bank.filter((q) => q.status === "published" && q.collection !== "book" && setup.topicIds.includes(q.topic)
       && levels.indexOf(q.level) <= levels.indexOf(setup.level) && q.complexity <= caps[setup.level]
@@ -70,12 +86,13 @@ export function startAssessment(id: string, setup: Omit<ReturnType<typeof parseS
   return state;
 }
 
-export function startBookAssessment(id: string, bank: BankQuestion[]): AssessmentState {
-  if (bank.length !== 15 || bank.some((q) => q.collection !== "book" || q.status !== "published")) {
+export function startBookAssessment(id: string, bank: BankQuestion[], questionCount = 15): AssessmentState {
+  if (bank.length !== questionCount || questionCount < 5 || questionCount > 50 || questionCount % 5 !== 0
+    || bank.some((q) => q.collection !== "book" || q.status !== "published")) {
     throw new AssessmentError("book_unavailable", 503);
   }
   return {
-    id, mode: "book", level: "Senior", company: null, topicIds: ["core-java"],
+    id, mode: "book", questionCount, level: "Senior", company: null, topicIds: ["core-java"],
     questions: bank, answers: [], currentId: bank[0].id, finishedEarly: false,
   };
 }
@@ -117,8 +134,8 @@ export function answerQuestion(state: AssessmentState, questionId: unknown, sele
     return next;
   }
   const topicAnswers = next.answers.filter((a) => state.questions.find((q) => q.id === a.questionId)?.topic === question.topic);
-  // At most three questions per topic; one unsuccessful answer ends that topic.
-  const harder = graded.score >= 7 && topicAnswers.length < 3 ? selectQuestion(next, question.topic, question.complexity) : undefined;
+  // The chosen depth allows one to three questions per topic; one unsuccessful answer ends that topic.
+  const harder = graded.score >= 7 && topicAnswers.length < questionsPerTopic(next) ? selectQuestion(next, question.topic, question.complexity) : undefined;
   const nextTopic = state.topicIds[state.topicIds.indexOf(question.topic) + 1];
   next.currentId = harder?.id ?? (nextTopic ? selectQuestion(next, nextTopic)?.id : null) ?? null;
   return next;
@@ -157,7 +174,7 @@ export function advanceQuestion(state: AssessmentState, questionId: unknown, sel
   if (!following && state.mode !== "book") {
     const next = { ...state, answers, turnIds };
     const topicAnswers = answers.filter((a) => state.questions.find((q) => q.id === a.questionId)?.topic === question.topic);
-    const harder = (graded?.score ?? 0) >= 7 && topicAnswers.length < 3
+    const harder = (graded?.score ?? 0) >= 7 && topicAnswers.length < questionsPerTopic(next)
       ? selectQuestion(next, question.topic, question.complexity) : undefined;
     const nextTopic = state.topicIds[state.topicIds.indexOf(question.topic) + 1];
     following = harder?.id ?? (nextTopic ? selectQuestion(next, nextTopic)?.id : undefined);
@@ -223,10 +240,10 @@ export function assessmentView(state: AssessmentState): AssessmentView {
     id: state.id, mode: "book", level: state.level, company: null, companyNotice: null,
     status: current ? "active" : "completed", question: current ? publicQuestion(current) : null,
     answered, skipped, completedCount: history.length, currentIndex: (state.cursor ?? history.length) + 1,
-    selected: [], canGoBack: false, readyToFinish: false, maximumQuestions: state.questions.length,
+    selected: [], canGoBack: false, readyToFinish: false, maximumQuestions: questionLimit(state),
     completedTopics: history.length, totalTopics: state.questions.length,
     earned, possible, percent, feedback: history.at(-1) ?? null, history, results,
-    summary: `You answered ${answered} and skipped ${skipped} of ${state.questions.length} sampled questions from the Java 8 practice book. Review your answers and source pages below.`,
+    summary: `You answered ${answered} and skipped ${skipped} of ${questionLimit(state)} sampled questions from the Java 8 practice book. Review your answers and source pages below.`,
     finishedEarly: state.finishedEarly,
   });
   const levelFeedback = percent === null ? "No answers scored yet."
@@ -241,7 +258,7 @@ export function assessmentView(state: AssessmentState): AssessmentView {
       : `No published interview evidence for ${state.company} in these topics. You will receive the general assessment.`,
     status: current ? "active" : "completed", question: current ? publicQuestion(current) : null,
     answered, skipped, completedCount: history.length, currentIndex: (state.cursor ?? history.length) + 1,
-    selected: [], canGoBack: false, readyToFinish: false, maximumQuestions: state.topicIds.length * 3,
+    selected: [], canGoBack: false, readyToFinish: false, maximumQuestions: questionLimit(state),
     completedTopics: current ? state.topicIds.indexOf(current.topic) : (state.finishedEarly ? covered : state.topicIds.length),
     totalTopics: state.topicIds.length, earned, possible, percent,
     feedback: history.at(-1) ?? null, history, results,

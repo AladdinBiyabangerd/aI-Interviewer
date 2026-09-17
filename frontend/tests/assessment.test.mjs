@@ -50,8 +50,26 @@ test("three consecutive roadmap sessions rotate exact questions without breaking
 test("Junior scope cannot activate advanced topics, invalid levels or duplicate topics", () => {
   for (const input of [{ level: "Junior", topicIds: ["concurrency"] }, { level: "Lead", topicIds: ["spring"] },
     { level: "Junior", topicIds: ["spring", "spring"] }, { level: "Junior", topicIds: [] },
-    { level: "Junior", topicIds: ["spring"], company: 42 }]) assert.throws(() => parseSetup(input));
+    { level: "Junior", topicIds: ["spring"], company: 42 },
+    { level: "Junior", topicIds: defaultTopics.Junior, questionCount: 7 },
+    { mode: "book", questionCount: 12 }, { mode: "book", questionCount: 55 }]) assert.throws(() => parseSetup(input));
   assert.ok(start().questions.every((q) => q.level === "Junior" && q.complexity <= 4));
+});
+test("users can choose roadmap depth and book test length", () => {
+  for (const depth of [1, 2, 3]) {
+    const setup = parseSetup({ level: "Junior", topicIds: defaultTopics.Junior, questionCount: defaultTopics.Junior.length * depth });
+    let state = withDeferredResults(startAssessment(`depth-${depth}`, setup, questionBank));
+    let guard = 20;
+    while (!assessmentView(state).readyToFinish && guard-- > 0) state = advanceQuestion(state, state.currentId, current(state).correct);
+    const view = assessmentView(state);
+    assert.equal(view.maximumQuestions, 5 * depth);
+    assert.equal(view.answered, 5 * depth);
+    assert.equal(view.readyToFinish, true);
+  }
+  const bookBank = Array.from({ length: 10 }, (_, index) => ({ ...questionBank[0], id: `short-book-${index}`, collection: "book" }));
+  const book = startBookAssessment("short-book", bookBank, 10);
+  assert.equal(assessmentView(book).maximumQuestions, 10);
+  assert.equal(parseSetup({ mode: "book", questionCount: 50 }).questionCount, 50);
 });
 test("unanswered keys and explanations are never exposed in the session response", () => {
   const view = assessmentView(start());

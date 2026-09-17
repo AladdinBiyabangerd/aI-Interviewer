@@ -64,7 +64,9 @@ export async function assessmentRequest(request: Request, id?: string) {
         const existing = await tx<{ state: AssessmentState }[]>`SELECT state FROM java_assessment_sessions WHERE id = ${newId} AND owner_hash = ${session.ownerHash} AND expires_at > now()`;
         if (existing[0]) {
           const s = existing[0].state;
-          if ((s.mode ?? "roadmap") !== setup.mode || s.level !== setup.level || s.company !== setup.company || JSON.stringify(s.topicIds) !== JSON.stringify(setup.topicIds)) throw new AssessmentError("request_id_reused", 409);
+          const storedQuestionCount = s.questionCount ?? (s.mode === "book" ? s.questions.length : s.topicIds.length * 3);
+          if ((s.mode ?? "roadmap") !== setup.mode || s.level !== setup.level || s.company !== setup.company
+            || storedQuestionCount !== setup.questionCount || JSON.stringify(s.topicIds) !== JSON.stringify(setup.topicIds)) throw new AssessmentError("request_id_reused", 409);
           return withDeferredResults(s);
         }
         const recent = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM java_assessment_sessions WHERE owner_hash = ${session.ownerHash} AND created_at > now() - interval '10 minutes'`;
@@ -79,15 +81,15 @@ export async function assessmentRequest(request: Request, id?: string) {
         const rows = setup.mode === "book"
           ? await tx<{ question: BankQuestion; status: BankQuestion["status"] }[]>`
             SELECT question, status FROM java_question_bank WHERE status = 'published'
-              AND question->>'collection' = 'book' ORDER BY random() LIMIT 60`
+              AND question->>'collection' = 'book' ORDER BY random() LIMIT 65`
           : await tx<{ question: BankQuestion; status: BankQuestion["status"] }[]>`
             SELECT question, status FROM (
               SELECT DISTINCT ON (id) question, status FROM java_question_bank WHERE status <> 'draft' ORDER BY id, version DESC
             ) latest WHERE status = 'published' AND question->>'collection' IS DISTINCT FROM 'book'`;
         const bank = rows.map((r) => ({ ...r.question, status: r.status }));
-        const eligibleBank = setup.mode === "book" ? bank.filter(hasConsistentBookAnswer).slice(0, 15) : bank;
+        const eligibleBank = setup.mode === "book" ? bank.filter(hasConsistentBookAnswer).slice(0, setup.questionCount) : bank;
         const next = withDeferredResults(setup.mode === "book"
-          ? startBookAssessment(newId, eligibleBank)
+          ? startBookAssessment(newId, eligibleBank, setup.questionCount)
           : startAssessment(newId, setup, eligibleBank, recentQuestionExposure(priorSessions.map((row) => row.state))));
         await tx`INSERT INTO java_assessment_sessions (id, owner_hash, state, expires_at)
           VALUES (${newId}, ${session.ownerHash}, ${tx.json(next)}, now() + (${retentionDays()} * interval '1 day'))`;

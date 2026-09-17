@@ -144,6 +144,17 @@
 .qa-company-input label { display: grid; gap: 6px; font-size: 13px; font-weight: 650; }
 .qa-company-input input, .qa-question-feedback select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #c7d6ec; border-radius: 8px; background: #fff; color: var(--qa-ink); }
 .qa-company-input p { margin: 0; color: var(--qa-muted); font-size: 12px; line-height: 1.55; }
+.qa-length { margin-top: 29px !important; padding-top: 24px !important; border-top: 1px solid var(--qa-line) !important; }
+.qa-length > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; }
+.qa-length label { position: relative; min-height: 104px; padding: 16px; border: 1px solid var(--qa-line); border-radius: 11px; background: #fff; cursor: pointer; transition: border-color .15s, background-color .15s, box-shadow .15s; }
+.qa-length label:hover { border-color: #8eb9f7; }
+.qa-length label.active { border-color: var(--qa-ingress-blue); background: #f2f6ff; box-shadow: 0 0 0 1px var(--qa-ingress-blue); }
+.qa-length label:has(input:focus-visible) { outline: 3px solid var(--qa-sky-blue); outline-offset: 3px; }
+.qa-length input { position: absolute; opacity: 0; }
+.qa-length b, .qa-length strong, .qa-length small { display: block; }
+.qa-length b { color: var(--qa-green-dark); font-size: 13px; }
+.qa-length strong { margin-top: 8px; color: var(--qa-ink); font-size: 17px; line-height: 1.25; }
+.qa-length small { margin-top: 5px; color: var(--qa-muted); font-size: 11px; line-height: 1.4; }
 .qa-start { display: flex; align-items: center; justify-content: space-between; gap: 30px; padding-top: 29px; }
 .qa-start b { font-size: 15px; }
 .qa-start p { max-width: 590px; margin: 4px 0 0; color: var(--qa-muted); font-size: 12px; line-height: 1.6; }

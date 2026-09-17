@@ -59,7 +59,7 @@ export default function HomePage() {
             <div className="qa-track-top"><span className="qa-track-icon" aria-hidden="true">{`{ }`}</span><span className="qa-track-status">{t("Açıqdır", "Available")}</span></div>
             <h3>Java</h3>
             <p>{t("Java və backend biliklərini yoxla. Səviyyənə uyğun test seç və ya Java 8 kitabı üzrə məşq et.", "Check your Java and backend knowledge. Choose a level-based assessment or practice with the Java 8 book.")}</p>
-            <div className="qa-track-tags"><span>Java & AI</span><span>Java 8</span><span>{t("15 suala qədər", "Up to 15 questions")}</span></div>
+            <div className="qa-track-tags"><span>Java & AI</span><span>Java 8</span><span>{t("Test uzunluğunu özün seç", "Choose your test length")}</span></div>
             <Link className="button button-primary qa-track-link" href="/java">{t("Java istiqamətinə keç", "Explore Java track")} <span aria-hidden="true">→</span></Link>
           </article>
           <article className="qa-track-card qa-track-card-upcoming">
