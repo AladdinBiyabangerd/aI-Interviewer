@@ -61,3 +61,18 @@ def test_runner_handles_operator_interrupt(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(application_runner.uvicorn, "Server", StubServer)
 
     assert application_runner.main() is None
+
+
+def test_listen_port_defaults_and_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("PORT", raising=False)
+    assert application_runner.listen_port() == 8000
+    monkeypatch.setenv("PORT", "8080")
+    assert application_runner.listen_port() == 8080
+    assert application_runner.listen_port("3000") == 3000
+    assert application_runner.listen_port("") == 8000
+
+
+@pytest.mark.parametrize("raw", ["0", "65536", "abc"])
+def test_listen_port_rejects_invalid(raw: str) -> None:
+    with pytest.raises(SystemExit):
+        application_runner.listen_port(raw)

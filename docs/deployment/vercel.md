@@ -1,5 +1,7 @@
 # Vercel deployment for Intervia
 
+> Also see the dual-host overview: [deployment README](README.md) and [Railway](railway.md).
+
 Intervia has a field-neutral landing page at `/` and Java as its first available
 interview track at `/java`. The Azerbaijani-first interface has an English option;
 the Java track offers a general Q&A assessment and a separate Java 8 book-practice mode. Vercel serves the Next.js UI
@@ -25,12 +27,33 @@ automatically.
 - Optionally configure `INTERVIEW_RETENTION_DAYS` from 1 through 30. The default is 7.
 - Use separate databases and secrets for Preview and Production.
 
+### Portal SSO (optional, additive)
+
+When the FastAPI API is hosted (typically on Railway), also set:
+
+```env
+INTERVIEW_API_BASE_URL=https://api.example.com
+PORTAL_OIDC_ISSUER=https://ingress.academy/
+PORTAL_OIDC_CLIENT_ID=interview-web
+PORTAL_OIDC_REDIRECT_URI=https://your-vercel-domain/api/auth/callback
+PORTAL_HOME_URL=https://ingress.academy/portal/welcome/
+```
+
+Allow that redirect URI on the portal OIDC client. Details:
+[portal-oidc-sso.md](../portal-oidc-sso.md).
+
 Only `NEXT_PUBLIC_APP_URL` is browser-visible. Never create a `NEXT_PUBLIC_` variant of
 a database URL or secret. Existing OpenAI or Blob credentials are unnecessary for the
 assessment and should remain configured only while approved cleanup of historical
 artifacts requires them.
 
-Generate a session or cron secret in PowerShell:
+Generate a session or cron secret:
+
+```bash
+openssl rand -base64 48
+```
+
+PowerShell:
 
 ```powershell
 [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))

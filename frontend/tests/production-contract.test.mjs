@@ -21,6 +21,11 @@ test("the deploy target is standard Next.js rather than the former edge preview 
   assert.equal(packageDocument.scripts.start, "next start");
   assert.equal(packageDocument.devDependencies?.vinext, undefined);
   assert.equal(packageDocument.devDependencies?.wrangler, undefined);
+  const nextConfig = await readFile(path.join(root, "next.config.ts"), "utf8");
+  assert.match(nextConfig, /output:\s*["']standalone["']/);
+  await readFile(path.join(root, "Dockerfile"), "utf8");
+  await readFile(path.join(root, "railway.toml"), "utf8");
+  await readFile(path.join(root, "vercel.json"), "utf8");
 });
 
 test("application sources contain no hardcoded localhost API target", async () => {

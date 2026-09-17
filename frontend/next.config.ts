@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Smaller container images on Railway/Docker; Vercel ignores this and uses its own output.
+  output: "standalone",
   poweredByHeader: false,
   async headers() {
     return [{

@@ -35,7 +35,8 @@ LABEL org.opencontainers.image.title="AI Interviewer Platform API" \
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/app/.venv/bin:${PATH}"
+    PATH="/app/.venv/bin:${PATH}" \
+    PORT=8000
 
 WORKDIR /app
 
@@ -49,12 +50,15 @@ RUN apk add --no-cache --upgrade \
 COPY --from=builder --chown=10001:10001 /app/.venv /app/.venv
 COPY --chown=10001:10001 alembic.ini ./alembic.ini
 COPY --chown=10001:10001 migrations ./migrations
+COPY --chown=10001:10001 scripts/railway-api-entrypoint.sh /app/railway-api-entrypoint.sh
+RUN chmod 755 /app/railway-api-entrypoint.sh
 
 USER 10001:10001
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live', timeout=2)"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+    CMD ["python", "-c", "import os,urllib.request; p=os.environ.get('PORT','8000'); urllib.request.urlopen(f'http://127.0.0.1:{p}/api/v1/health/live', timeout=2)"]
 
+ENTRYPOINT ["/app/railway-api-entrypoint.sh"]
 CMD ["ai-interviewer-api"]

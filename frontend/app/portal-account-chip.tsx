@@ -39,7 +39,7 @@ export function PortalAccountChip({ language }: Props) {
 
   if (!available) return null;
 
-  const portalUrl = me?.portal_url || "http://127.0.0.1:8000/portal/welcome/";
+  const portalUrl = (me?.portal_url || "").trim();
   const displayName = (me?.display_name || "").trim();
   const initials = displayName
     ? displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("")
@@ -54,9 +54,11 @@ export function PortalAccountChip({ language }: Props) {
             <span className="qa-portal-name-text">{displayName}</span>
           </span>
         ) : null}
-        <a className="qa-portal-btn" href={portalUrl}>
-          {t("Portal", "Portal")}
-        </a>
+        {portalUrl ? (
+          <a className="qa-portal-btn" href={portalUrl}>
+            {t("Portal", "Portal")}
+          </a>
+        ) : null}
         <a className="qa-portal-logout" href="/api/auth/logout">
           {t("Çıxış", "Sign out")}
         </a>

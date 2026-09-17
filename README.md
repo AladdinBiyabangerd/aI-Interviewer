@@ -54,6 +54,17 @@ process may still use `SITE_BASE_URL=https://ingress.academy` as issuer).
 
 In Cursor: **Terminal → Run Task → Start All** (`.vscode/tasks.json`).
 
+## Hosted deploy (Vercel + Railway)
+
+Both targets are supported:
+
+- **Vercel** — Next.js UI (`frontend/`) — [docs/deployment/vercel.md](docs/deployment/vercel.md)
+- **Railway** — Postgres + FastAPI API (and optionally the same Next.js app) —
+  [docs/deployment/railway.md](docs/deployment/railway.md)
+
+Recommended: Vercel for the UI, Railway for Postgres + API (Portal SSO). Overview:
+[docs/deployment/README.md](docs/deployment/README.md).
+
 ## Current scope
 
 Phases 0A, 0B, 0C-A, 0C-B, 0C-C, 0D-A, 0D-B, 0D-C-A, the bounded 0D-C-B1 baseline evidence tooling, and Phase 1A-A through 1A-D4 are implemented and locally release-verified. Phase 1B is in progress: 1B-A adds the disabled-by-default provider-neutral model gateway, 1B-B1 adds strict evidence-linked CV/JD schemas, 1B-B2 adds encrypted immutable profiles and durable fenced jobs, 1B-C1 adds a policy-gated profiling worker, and 1B-C2 adds authenticated owner profile status/inspection plus immutable correction. Phase 1B-D1 adds an offline, payload-safe labeled quality evaluator with fixed field/slice/span/review thresholds, a separate digest-bound four-role approval contract, and a deliberately non-qualifying synthetic AZ/EN CV/JD seed. Phase 1B-D2.1 adds a concrete, disabled-by-default OpenAI Responses adapter; D2.2a adds an explicit-confirmation offline runner bound to an exact private corpus, approval window, prompt digest, and OpenAI release, plus a deliberately unadjudicated review-draft step and a provider-free authorization preflight. D2.2b1 adds exact, create-only finalization that permits human adjudication/owner outcomes while rejecting corpus, prediction, provenance, release, and fixture-order drift. Generated history is never overwritten: every correction is a new encrypted, evidence-revalidated version protected by strong `If-Match` concurrency and exact-retry idempotency. The profiling worker binds code-owned prompts, an approved immutable processor activity, encrypted processor-usage registration, one provider request ID, independent evidence validation, encrypted persistence, and the live job lease. Source text, extraction/profiling-job metadata, and decrypted owned profile histories participate in account privacy export and owner/document cascades erase them. A bounded payload-blind worker process can now supervise explicitly enabled extraction and profiling workers, but both workers and their operational deployment remain disabled by default. No API credential or real corpus is bundled and no live OpenAI request was made during verification. Real prediction evidence, human adjudication, error analysis, threshold success, named quality approval, production worker activation, interview, evaluation, report, RAG, voice, and video remain pending. Live staging measurement and the remaining 0D reliability/production gates are deferred until the text flow is feature-stable under [ADR 0010](docs/adr/0010-feature-stable-mvp-before-hosted-reliability-baseline.md); they remain mandatory before production.
