@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Smaller container images on Railway/Docker; Vercel ignores this and uses its own output.
-  output: "standalone",
+  // Next.js 16.3's Vercel adapter cannot build standalone output; Railway/Docker still need it.
+  output: process.env.VERCEL ? undefined : "standalone",
   poweredByHeader: false,
   async headers() {
     return [{
