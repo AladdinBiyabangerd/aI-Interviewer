@@ -12,6 +12,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "bank": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/question-bank.mjs",
     "admin:setup": "node scripts/setup-admin.mjs",
+    "admin:rotate": "node scripts/setup-admin.mjs --rotate",
     "test:assessment:http": "node --experimental-strip-types scripts/assessment-http.integration.mjs",
     "lint": "eslint . --ignore-pattern .next --ignore-pattern dist --ignore-pattern .vinext --ignore-pattern .wrangler",
     "typecheck": "tsc --noEmit"
