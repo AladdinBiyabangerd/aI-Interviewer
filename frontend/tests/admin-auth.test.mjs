@@ -20,8 +20,12 @@ test("admin session requires a valid signature, current password hash and unexpi
   const now = 1_700_000_000_000;
   const token = issueAdminSession(secret, hash, "admin", now);
   const tampered = `${token.slice(0, -1)}${token.endsWith("A") ? "B" : "A"}`;
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const alternateLast = alphabet[alphabet.indexOf(token.at(-1)) ^ 1];
+  const noncanonicalSignature = `${token.slice(0, -1)}${alternateLast}`;
   assert.equal(verifyAdminSession(token, secret, hash, "admin", now), true);
   assert.equal(verifyAdminSession(tampered, secret, hash, "admin", now), false);
+  assert.equal(verifyAdminSession(noncanonicalSignature, secret, hash, "admin", now), false);
   assert.equal(verifyAdminSession(token, secret, hash, "other", now), false);
   assert.equal(verifyAdminSession(token, secret, `${hash}changed`, "admin", now), false);
   assert.equal(verifyAdminSession(token, secret, hash, "admin", now + 12 * 60 * 60 * 1000), false);

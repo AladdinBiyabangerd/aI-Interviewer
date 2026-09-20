@@ -44,7 +44,7 @@ export function verifyAdminSession(token: string | null, secret: string, passwor
   const current = Math.floor(now / 1000);
   if (issued > current || expires <= current || expires - issued !== sessionLifetimeSeconds) return false;
   const unsigned = `${version}.${issuedText}.${expiresText}.${nonce}`;
-  const expected = Buffer.from(signature(unsigned, secret, passwordHash, username), "base64url");
-  const received = Buffer.from(receivedSignature, "base64url");
+  const expected = Buffer.from(signature(unsigned, secret, passwordHash, username), "ascii");
+  const received = Buffer.from(receivedSignature, "ascii");
   return expected.length === received.length && timingSafeEqual(expected, received);
 }

@@ -22,7 +22,7 @@ test("the deploy target is standard Next.js rather than the former edge preview 
   assert.equal(packageDocument.devDependencies?.vinext, undefined);
   assert.equal(packageDocument.devDependencies?.wrangler, undefined);
   const nextConfig = await readFile(path.join(root, "next.config.ts"), "utf8");
-  assert.match(nextConfig, /output:\s*["']standalone["']/);
+  assert.match(nextConfig, /output:\s*process\.env\.VERCEL\s*\?\s*undefined\s*:\s*["']standalone["']/);
   await readFile(path.join(root, "Dockerfile"), "utf8");
   await readFile(path.join(root, "railway.toml"), "utf8");
   await readFile(path.join(root, "vercel.json"), "utf8");
