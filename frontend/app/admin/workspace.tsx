@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { levels, topics, type Level } from "../../lib/assessment";
 import type { QuestionInput } from "../../lib/admin-question";
 import type { BankQuestion } from "../../lib/server/assessment-bank";
@@ -50,6 +51,7 @@ async function api<T>(url: string, method = "GET", input?: unknown): Promise<T> 
 }
 
 export default function AdminWorkspace({ name }: { name: string }) {
+  const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [editor, setEditor] = useState<Editor>(emptyEditor);
   const [tagText, setTagText] = useState("");
@@ -157,7 +159,7 @@ export default function AdminWorkspace({ name }: { name: string }) {
   };
 
   return <div className="admin-shell">
-    <header className="admin-header"><div className="admin-header-inner"><Brand /><nav aria-label="Admin naviqasiyası"><Link href="/java">İstifadəçi görünüşü</Link><span>Sual bankı</span></nav><div className="admin-identity"><span>{name}</span><Link href="/api/auth/logout">Çıxış</Link></div></div></header>
+    <header className="admin-header"><div className="admin-header-inner"><Brand /><nav aria-label="Admin naviqasiyası"><Link href="/java">İstifadəçi görünüşü</Link><span>Sual bankı</span></nav><div className="admin-identity"><span>{name}</span><button type="button" onClick={async () => { try { await api("/api/admin/session", "DELETE"); router.replace("/admin/login"); router.refresh(); } catch { setError("Çıxış mümkün olmadı. Yenidən cəhd edin."); } }}>Çıxış</button></div></div></header>
     <main className="admin-main">
       <div className="admin-heading"><div><span className="admin-kicker">İdarəetmə paneli</span><h1>Sual bankı</h1><p>Sualları yaradın, cavabları yoxlayın və hazır olduqda istifadəçilər üçün nəşr edin.</p></div><div className="admin-stat"><strong>{counts.published}</strong><span>Nəşr olunmuş admin sualı</span></div></div>
       {error && <div className="admin-alert admin-alert-error" role="alert">{error}</div>}

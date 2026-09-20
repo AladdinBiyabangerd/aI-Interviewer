@@ -5,16 +5,16 @@ Two hosts are supported side by side:
 | Surface | Recommended host | Also works on |
 |---------|------------------|---------------|
 | Next.js UI + assessment APIs (`frontend/`) | **Vercel** | Railway (Docker) |
-| FastAPI identity / OIDC resource server (repo root) | **Railway** | any Docker host |
+| FastAPI platform API (repo root) | **Railway** | any Docker host |
 | PostgreSQL | Railway Postgres, Neon, or Vercel Marketplace Postgres | — |
 
-## Recommended topology (SSO + assessment)
+## Recommended topology (assessment + admin editor)
 
 1. **Postgres** — Railway Postgres (or Neon). Same logical DB for Next assessment tables and the FastAPI Alembic schema.
-2. **API** — Railway service from repo root (`Dockerfile` + `railway.toml`). Needed for Portal SSO (`/api/v1/identity/me`).
+2. **API** — Railway service from repo root (`Dockerfile` + `railway.toml`) for the Python platform and migrations.
 3. **Frontend** — Vercel project with Root Directory `frontend` (see [vercel.md](vercel.md)).
 
-Portal (ingress-academy) stays on its own host; wire HTTPS issuer / audience / redirect URIs per [portal-oidc-sso.md](../portal-oidc-sso.md).
+The current frontend admin login is standalone. Portal SSO integration is deferred.
 
 ## All-Railway topology
 

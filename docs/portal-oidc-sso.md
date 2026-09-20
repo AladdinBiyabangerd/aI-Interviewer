@@ -1,5 +1,8 @@
 # Portal OIDC SSO (ingress-academy issuer)
 
+> Deferred: the current frontend does not expose Portal login or `/api/auth/*` routes.
+> This document is retained as background for a future identity integration.
+
 The interview API is an OAuth 2.0 **resource server**. It does not implement login.
 Point it at the portal issuer documented in
 `ingress-academy/docs/oidc-issuer.md`.
@@ -48,5 +51,5 @@ uv run python scripts/smoke_portal_oidc.py
 
 Expected JSON: `{ "account_id": "<uuid>" }` (scope `profile:read` required).
 
-The Next.js Java assessment still uses anonymous signed cookies; portal SSO is an
-additive proof path via `/api/auth/*` and does not migrate assessment ownership yet.
+This was an additive proof path for the anonymous Java assessment. The frontend
+routes described above are currently removed pending a future identity connection.

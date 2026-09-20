@@ -23,9 +23,13 @@ draft. Published questions enter new general Java assessments for their topic an
 active sessions retain their original question snapshot. Editing a published question
 creates a new draft revision. Retiring a question removes it from future assessments.
 
-Configure the Portal OIDC integration and set `INTERVIEW_ADMIN_ACCOUNT_IDS` to the
-exact `account_id` returned by `/api/auth/me` after login. Every admin API operation
-checks the current Portal access token with FastAPI before comparing this allowlist.
+Run `npm run admin:setup` in `frontend/` to generate a local admin account. It writes
+the username and a random password to the ignored `.admin-credentials` file and the
+password hash to the ignored `.env.local` file. Open `/admin/login` to sign in. The
+admin session uses a signed, `HttpOnly` cookie and expires after 12 hours. For a hosted
+deployment, configure `INTERVIEW_ADMIN_USERNAME` and `INTERVIEW_ADMIN_PASSWORD_HASH`
+from `.env.local` as server-only environment variables. Rotating the password with
+`npm run admin:setup -- --rotate` also invalidates existing admin sessions.
 AI generation also requires server-side `OPENAI_API_KEY` and uses
 `OPENAI_INTERVIEW_MODEL` (default `gpt-5.5`). It saves at most three questions per
 request and 30 AI questions per hour. The AI does not verify the supplied source URL,

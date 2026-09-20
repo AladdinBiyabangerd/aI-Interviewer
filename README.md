@@ -39,18 +39,9 @@ SEED_QUESTION_BANK=1 ./scripts/dev-up.sh
 
 Stop with `Ctrl+C`.
 
-Portal SSO (“Sign in with Ingress”): also run ingress-academy on `:8000` **with a fresh
-process** after OIDC env is set (so `OIDC_ISSUER=http://127.0.0.1:8000/` is loaded):
-
-```bash
-cd "/Users/mac/My Workspace/My projects/ingress-academy"
-source .venv/bin/activate
-python manage.py runserver 127.0.0.1:8000
-```
-
-Then on http://localhost:3000 click **Sign in with Ingress**. Success shows an `account_id`.
-If you see `sso_error=iss_mismatch` or `api_rejected_token`, restart the portal (old
-process may still use `SITE_BASE_URL=https://ingress.academy` as issuer).
+The admin question editor uses a separate login at `/admin/login`. Run
+`npm run admin:setup` in `frontend/` to create local credentials; see
+[the frontend README](frontend/README.md) for the deployment settings.
 
 In Cursor: **Terminal → Run Task → Start All** (`.vscode/tasks.json`).
 
@@ -62,7 +53,7 @@ Both targets are supported:
 - **Railway** — Postgres + FastAPI API (and optionally the same Next.js app) —
   [docs/deployment/railway.md](docs/deployment/railway.md)
 
-Recommended: Vercel for the UI, Railway for Postgres + API (Portal SSO). Overview:
+Recommended: Vercel for the UI, Railway for Postgres + API. Overview:
 [docs/deployment/README.md](docs/deployment/README.md).
 
 ## Current scope

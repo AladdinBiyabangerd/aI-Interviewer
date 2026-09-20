@@ -45,6 +45,8 @@ test("all sensitive production configuration is server-only", async () => {
     "BLOB_READ_WRITE_TOKEN",
     "OPENAI_API_KEY",
     "INTERVIEW_SESSION_SECRET",
+    "INTERVIEW_ADMIN_USERNAME",
+    "INTERVIEW_ADMIN_PASSWORD_HASH",
     "OPENAI_WEBHOOK_SECRET",
     "CRON_SECRET",
   ]) {

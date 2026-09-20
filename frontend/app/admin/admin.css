@@ -7,6 +7,7 @@
 .admin-header nav span { color: #22334b; font-weight: 700; }
 .admin-identity { margin-left: auto; display: flex; align-items: center; gap: 18px; font-size: 13px; color: #667080; }
 .admin-identity a { color: #315fbe; text-decoration: none; }
+.admin-identity button { border: 0; padding: 0; background: transparent; color: #315fbe; font-size: 13px; font-weight: 650; }
 .admin-main { width: min(1440px, calc(100% - 64px)); margin: auto; padding: 45px 0 80px; }
 .admin-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
 .admin-kicker { display: inline-block; color: #315fbe; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; font-weight: 800; }
@@ -87,5 +88,11 @@
 .admin-gate .brand img { width: 180px; height: auto; }
 .admin-gate section { margin-top: 80px; padding: 34px; border: 1px solid #e2e7ed; border-radius: 14px; background: #fff; }
 .admin-gate .admin-primary { margin-top: 25px; }
+.admin-login-form { display: grid; gap: 16px; margin-top: 25px; }
+.admin-login-form label { display: grid; gap: 7px; color: #465368; font-size: 13px; font-weight: 650; }
+.admin-login-form input { width: 100%; padding: 11px 12px; border: 1px solid #dbe1e8; border-radius: 7px; background: #fff; color: #25344a; font-size: 15px; }
+.admin-login-form .admin-primary { margin-top: 3px; }
+.admin-login-error, .admin-login-warning { color: #a33b3b !important; font-size: 13px; }
+.admin-back { display: inline-block; margin-top: 22px; color: #536581; font-size: 13px; text-decoration: none; }
 @media (max-width: 1050px) { .admin-grid { grid-template-columns: 1fr; } .admin-question-list { max-height: none; } }
 @media (max-width: 650px) { .admin-header-inner, .admin-main { width: min(100% - 32px, 1440px); } .admin-header-inner { min-height: 68px; gap: 15px; } .admin-header .brand img { width: 125px; } .admin-header nav { gap: 8px; font-size: 12px; } .admin-header nav span { display: none; } .admin-identity span { display: none; } .admin-heading { align-items: start; } .admin-stat { min-width: 110px; padding: 10px; } .admin-stat span { font-size: 10px; } .admin-main { padding-top: 28px; } .admin-panel-body { padding: 20px; } .admin-fields-three, .admin-fields-two { grid-template-columns: 1fr; } .admin-ai-submit { align-items: stretch; flex-direction: column; } .admin-ai-submit label { width: 100%; } }

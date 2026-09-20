@@ -27,26 +27,16 @@ automatically.
 - Optionally configure `INTERVIEW_RETENTION_DAYS` from 1 through 30. The default is 7.
 - Use separate databases and secrets for Preview and Production.
 
-### Portal SSO (optional, additive)
+### Admin question editor
 
-When the FastAPI API is hosted (typically on Railway), also set:
-
-```env
-INTERVIEW_API_BASE_URL=https://api.example.com
-PORTAL_OIDC_ISSUER=https://ingress.academy/
-PORTAL_OIDC_CLIENT_ID=interview-web
-PORTAL_OIDC_REDIRECT_URI=https://your-vercel-domain/api/auth/callback
-PORTAL_HOME_URL=https://ingress.academy/portal/welcome/
-```
-
-Allow that redirect URI on the portal OIDC client. Details:
-[portal-oidc-sso.md](../portal-oidc-sso.md).
-
-The `/admin` question editor requires Portal SSO. Add the exact `account_id` from
-`GET /api/auth/me` to the server-only `INTERVIEW_ADMIN_ACCOUNT_IDS` setting (comma-separated
-for multiple admins). Set server-only `OPENAI_API_KEY` to enable AI question drafts;
-manual question entry does not require the OpenAI key. Both paths save private drafts,
-and only a reviewed, published question enters future Java assessments.
+Run `npm run admin:setup` in `frontend/` once, then set the generated
+`INTERVIEW_ADMIN_USERNAME` and `INTERVIEW_ADMIN_PASSWORD_HASH` from the ignored
+`.env.local` file as server-only Vercel environment variables. Keep the generated
+plaintext password from the ignored `.admin-credentials` file private. The admin logs
+in at `/admin/login`; no Portal OIDC client or FastAPI identity API is used for this
+login. Set server-only `OPENAI_API_KEY` to enable AI question drafts. Manual question
+entry needs no model key. Both paths save private drafts, and only a reviewed,
+published question enters future Java assessments.
 
 Only `NEXT_PUBLIC_APP_URL` is browser-visible. Never create a `NEXT_PUBLIC_` variant of
 a database URL or secret. Existing OpenAI or Blob credentials are unnecessary for the
