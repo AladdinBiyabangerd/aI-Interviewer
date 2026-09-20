@@ -42,6 +42,12 @@ PORTAL_HOME_URL=https://ingress.academy/portal/welcome/
 Allow that redirect URI on the portal OIDC client. Details:
 [portal-oidc-sso.md](../portal-oidc-sso.md).
 
+The `/admin` question editor requires Portal SSO. Add the exact `account_id` from
+`GET /api/auth/me` to the server-only `INTERVIEW_ADMIN_ACCOUNT_IDS` setting (comma-separated
+for multiple admins). Set server-only `OPENAI_API_KEY` to enable AI question drafts;
+manual question entry does not require the OpenAI key. Both paths save private drafts,
+and only a reviewed, published question enters future Java assessments.
+
 Only `NEXT_PUBLIC_APP_URL` is browser-visible. Never create a `NEXT_PUBLIC_` variant of
 a database URL or secret. Existing OpenAI or Blob credentials are unnecessary for the
 assessment and should remain configured only while approved cleanup of historical

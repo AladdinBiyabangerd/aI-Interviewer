@@ -14,6 +14,23 @@ enter draft; publish the exact revisions after review. OpenAI and Blob are not n
 for assessments. The former interview page is retained in `legacy/page.tsx` and its
 public endpoints return 410.
 
+### Admin question editor
+
+`/admin` lets an authorized operator add Java questions manually or generate them through
+an AI chat. Both paths save complete questions to `java_question_bank` as private drafts.
+The operator can edit the answer key, explanation, and HTTPS source, then publish the
+draft. Published questions enter new general Java assessments for their topic and level;
+active sessions retain their original question snapshot. Editing a published question
+creates a new draft revision. Retiring a question removes it from future assessments.
+
+Configure the Portal OIDC integration and set `INTERVIEW_ADMIN_ACCOUNT_IDS` to the
+exact `account_id` returned by `/api/auth/me` after login. Every admin API operation
+checks the current Portal access token with FastAPI before comparing this allowlist.
+AI generation also requires server-side `OPENAI_API_KEY` and uses
+`OPENAI_INTERVIEW_MODEL` (default `gpt-5.5`). It saves at most three questions per
+request and 30 AI questions per hour. The AI does not verify the supplied source URL,
+so an operator must review each draft before publishing. No new migration is required.
+
 Operator-supplied question PDFs use the private
 [source-ingestion workflow](../docs/java-question-source-ingestion.md). Deterministic
 extraction preserves page provenance and answer pairing; it does not use a model or

@@ -5,6 +5,7 @@ export type BankQuestion = PublicQuestion & {
   level: Level; correct: string[]; explanation: string; references: Reference[];
   status: "published" | "draft" | "retired";
   collection?: "book";
+  editorialOrigin?: "manual" | "ai";
 };
 const refs = {
   java: { title: "Oracle: Java language basics", url: "https://dev.java/learn/language-basics/" },
