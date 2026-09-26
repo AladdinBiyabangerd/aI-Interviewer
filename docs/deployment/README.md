@@ -14,7 +14,9 @@ Two hosts are supported side by side:
 2. **API** — Railway service from repo root (`Dockerfile` + `railway.toml`) for the Python platform and migrations.
 3. **Frontend** — Vercel project with Root Directory `frontend` (see [vercel.md](vercel.md)).
 
-The current frontend admin login is standalone. Portal SSO integration is deferred.
+The frontend admin login remains standalone. Optional Portal SSO is available for the
+public application and is disabled by default; follow the
+[Portal OIDC runbook](../portal-oidc-sso.md) before enabling it.
 
 ## All-Railway topology
 

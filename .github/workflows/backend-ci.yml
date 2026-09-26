@@ -28,6 +28,19 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Build frontend release image
+        run: >-
+          docker build
+          --build-arg NEXT_PUBLIC_APP_URL=https://interview.invalid
+          --tag intervia-web:ci
+          .
+      - name: Scan frontend image for high and critical vulnerabilities
+        run: >-
+          docker run --rm
+          --volume /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+          image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --no-progress
+          intervia-web:ci
 
   verify:
     runs-on: ubuntu-latest

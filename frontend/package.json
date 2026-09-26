@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test": "node --conditions=react-server --experimental-strip-types --test tests/*.test.mjs",
     "bank": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/question-bank.mjs",
     "admin:setup": "node scripts/setup-admin.mjs",
     "admin:rotate": "node scripts/setup-admin.mjs --rotate",
@@ -19,11 +19,13 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.3.0",
+    "jose": "^6.2.12",
     "next": "^16.3.4",
     "openai": "^7.9.0",
     "postgres": "^3.4.7",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.1",

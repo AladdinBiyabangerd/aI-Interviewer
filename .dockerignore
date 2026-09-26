@@ -1,6 +1,10 @@
 .git
 .github
 .env
+.env.*
+**/.env
+**/.env.*
+**/.admin-credentials
 .venv
 .mypy_cache
 .pytest_cache
@@ -10,5 +14,14 @@ htmlcov
 tmp
 tests
 docs
+frontend
+node_modules
+.next
+.vercel
+.vinext
+.wrangler
+.openai
+coverage
+*.tsbuildinfo
 *.pyc
 __pycache__

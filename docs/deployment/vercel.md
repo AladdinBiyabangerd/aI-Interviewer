@@ -24,6 +24,11 @@ automatically.
   Keep the direct/unpooled URL for the one-off migration job.
 - Configure `NEXT_PUBLIC_APP_URL`, `INTERVIEW_SESSION_SECRET` and `CRON_SECRET`.
   The two secrets must be different; the session secret must contain at least 32 bytes.
+- For Portal SSO, configure the server-only `PORTAL_OIDC_ENABLED`, `PORTAL_OIDC_ISSUER`,
+  `PORTAL_OIDC_CLIENT_ID`, `PORTAL_OIDC_REDIRECT_URI`, `PORTAL_OIDC_JWKS_URL`,
+  `INTERVIEW_API_BASE_URL`, and optional `PORTAL_HOME_URL` values from
+  [the OIDC runbook](../portal-oidc-sso.md).
+  The exact callback URI must also be registered in the Portal.
 - Optionally configure `INTERVIEW_RETENTION_DAYS` from 1 through 30. The default is 7.
 - Use separate databases and secrets for Preview and Production.
 
@@ -33,8 +38,8 @@ Run `npm run admin:setup` in `frontend/` once, then set the generated
 `INTERVIEW_ADMIN_USERNAME` and `INTERVIEW_ADMIN_PASSWORD_HASH` from the ignored
 `.env.local` file as server-only Vercel environment variables. Keep the generated
 plaintext password from the ignored `.admin-credentials` file private. The admin logs
-in at `/admin/login`; no Portal OIDC client or FastAPI identity API is used for this
-login. Set server-only `OPENAI_API_KEY` to enable AI question drafts. Manual question
+in at `/admin/login`; Portal OIDC remains separate from this admin login. Set
+server-only `OPENAI_API_KEY` to enable AI question drafts. Manual question
 entry needs no model key. Both paths save private drafts, and only a reviewed,
 published question enters future Java assessments.
 

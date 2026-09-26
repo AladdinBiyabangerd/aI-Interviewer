@@ -47,12 +47,37 @@ test("all sensitive production configuration is server-only", async () => {
     "INTERVIEW_SESSION_SECRET",
     "INTERVIEW_ADMIN_USERNAME",
     "INTERVIEW_ADMIN_PASSWORD_HASH",
+    "PORTAL_OIDC_ENABLED",
+    "PORTAL_OIDC_ISSUER",
+    "PORTAL_OIDC_CLIENT_ID",
+    "PORTAL_OIDC_REDIRECT_URI",
+    "PORTAL_OIDC_JWKS_URL",
+    "INTERVIEW_API_BASE_URL",
     "OPENAI_WEBHOOK_SECRET",
     "CRON_SECRET",
   ]) {
     assert.match(env, new RegExp(`^${name}=`, "m"));
     assert.doesNotMatch(env, new RegExp(`NEXT_PUBLIC_${name}`));
   }
+});
+
+test("Portal login uses authorization code PKCE and server-only cookies", async () => {
+  const oidc = await readFile(path.join(root, "lib", "server", "portal-oidc.ts"), "utf8");
+  const login = await readFile(path.join(root, "app", "api", "auth", "login", "route.ts"), "utf8");
+  const callback = await readFile(path.join(root, "app", "api", "auth", "callback", "route.ts"), "utf8");
+  assert.match(login, /response_type:\s*["']code["']/);
+  assert.match(login, /code_challenge_method:\s*["']S256["']/);
+  assert.match(login, /state/);
+  assert.match(login, /nonce/);
+  assert.match(oidc, /HttpOnly/);
+  assert.match(oidc, /SameSite=Lax/);
+  assert.match(oidc, /PORTAL_OIDC_ENABLED/);
+  assert.match(oidc, /jwtVerify/);
+  assert.match(oidc, /audience:\s*config\.clientId/);
+  assert.match(oidc, /payload\.nonce !== expectedNonce/);
+  assert.match(callback, /state !== pkce\.state/);
+  assert.match(callback, /\/api\/v1\/identity\/me/);
+  assert.doesNotMatch(oidc, /NEXT_PUBLIC_(?:PORTAL|INTERVIEW_API)/);
 });
 
 test("long research is backgrounded and every downstream phase is persisted", async () => {

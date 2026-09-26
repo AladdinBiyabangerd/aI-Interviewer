@@ -4,6 +4,7 @@ import { json } from "../../../lib/server/http";
 import { defaultTopics, levels } from "../../../lib/assessment";
 import type { BankQuestion } from "../../../lib/server/assessment-bank";
 import { startAssessment } from "../../../lib/server/assessment-engine";
+import { portalOidcConfigurationIssue } from "../../../lib/server/portal-oidc";
 
 export const runtime = "nodejs";
 export const maxDuration = 10;
@@ -17,6 +18,9 @@ export async function GET() {
   ];
   const missing = required.filter((name) => !process.env[name]?.trim());
   if (missing.length) return json({ status: "not_ready", code: "configuration_incomplete" }, 503);
+  if (portalOidcConfigurationIssue()) {
+    return json({ status: "not_ready", code: "portal_oidc_configuration_invalid" }, 503);
+  }
   try {
     const rows = await database()<{ version_num: string }[]>`SELECT version_num FROM alembic_version`;
     if (rows[0]?.version_num !== EXPECTED_DATABASE_REVISION) {

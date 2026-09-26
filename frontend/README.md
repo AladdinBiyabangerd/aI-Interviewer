@@ -40,6 +40,14 @@ Operator-supplied question PDFs use the private
 extraction preserves page provenance and answer pairing; it does not use a model or
 publish staged source wording.
 
+### Optional Portal login
+
+The public home and Java pages can show an optional Ingress Portal login. It is disabled
+by default and remains separate from `/admin/login`. Configure the server-only Portal
+OIDC variables in `.env.example`, enable matching OIDC validation on the FastAPI service,
+and register the exact callback URI before setting `PORTAL_OIDC_ENABLED=true`. See the
+[Portal OIDC runbook](../docs/portal-oidc-sso.md).
+
 ## Historical interview implementation (not public in the MVP)
 
 This directory retains the former English and Azerbaijani interview implementation for
